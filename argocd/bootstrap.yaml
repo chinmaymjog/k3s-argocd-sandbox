@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/chinmaymjog/k3s-argocd-sandbox.git'
-    targetRevision: HEAD
+    targetRevision: main
     path: apps
     directory:
       recurse: true
