@@ -163,14 +163,16 @@ Adding a new tool to the GitOps flow is standardized:
 3.  **Commit & Push**: Commit the new folder to your GitHub fork.
 4.  **Auto-Sync**: ArgoCD will detect the change within 3 minutes and automatically apply it!
 
+### Apps that require a Database
+If your new app needs a PostgreSQL or MySQL database:
+1. Add your new database password to `apps/secrets.yaml`.
+2. Add your password as an environment variable in `apps/pgsql/pgsql.yaml` under the `postgres` container `env:` section.
+3. In the same `pgsql.yaml` file, scroll up to the `pgsql-init-scripts` ConfigMap and add a new line at the bottom: `create_user_and_database "myapp" "myapp" "\${MYAPP_DB_PASSWORD}"`
+4. Commit and push your changes.
+5. **Apply it to the live database:** Because database init-scripts only run automatically on the *first* boot of a new volume, you need to manually trigger the script to create your new database without wiping your existing data:
+   ```bash
+   kubectl exec -it deployment/pgsql -- bash /docker-entrypoint-initdb.d/init-databases.sh
+   ```
+
 ---
-
-## 📚 Content & Community
-
-This project is part of a larger effort to share high-quality DevOps and Cloud Architecture patterns. 
-
-- **Technical Article**: Deep dive into the "why" behind this architecture (available on Medium/LinkedIn).
-- **Publishing Engine**: I use my standalone [Content-Ops](https://github.com/chinmaymjog/content-ops) tool to automate the transition of these docs to Medium and LinkedIn.
-
----
-*Maintained by [Chinmay Jog](https://github.com/chinmaymjog)*
+*Maintained by [Chinmay Jog](https://github.com/chinmaymjog) | 📖 [Read my articles on Medium](https://medium.com/@chinmaymjog)*
