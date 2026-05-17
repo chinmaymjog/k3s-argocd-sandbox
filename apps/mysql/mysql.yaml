@@ -19,14 +19,14 @@ data:
     #!/bin/bash
     set -e
     create_user_and_database() {
-      local database=\$1
-      local user=\$2
-      local password=\$3
-      echo "  Ensuring MySQL database '\$database' and user '\$user' exist..."
-      mysql -u root -p"\${MYSQL_ROOT_PASSWORD}" <<-EOSQL
-        CREATE DATABASE IF NOT EXISTS \`\$database\`;
-        CREATE USER IF NOT EXISTS '\$user'@'%' IDENTIFIED BY '\$password';
-        GRANT ALL PRIVILEGES ON \`\$database\`.* TO '\$user'@'%';
+      local database=$1
+      local user=$2
+      local password=$3
+      echo "  Ensuring MySQL database '$database' and user '$user' exist..."
+      mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
+        CREATE DATABASE IF NOT EXISTS \`$database\`;
+        CREATE USER IF NOT EXISTS '$user'@'%' IDENTIFIED BY '$password';
+        GRANT ALL PRIVILEGES ON \`$database\`.* TO '$user'@'%';
         FLUSH PRIVILEGES;
     EOSQL
     }
