@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgsql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgsql-init-scripts
+data:
+  init-databases.sh: |
+    #!/bin/bash
+    set -e
+    create_user_and_database() {
+      local database=\$1
+      local user=\$2
+      local password=\$3
+      echo "  Ensuring database '\$database' and user '\$user' exist..."
+      export PGPASSWORD="\${POSTGRES_PASSWORD}"
+      psql -v ON_ERROR_STOP=1 --username "\${POSTGRES_USER:-postgres}" --dbname "postgres" <<-EOSQL
+        DO \$\$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '\$user') THEN
+            CREATE USER "\$user" WITH PASSWORD '\$password';
+          END IF;
+        END
+        \$\$;
+    EOSQL
+      psql -v ON_ERROR_STOP=1 --username "\${POSTGRES_USER:-postgres}" --dbname "postgres" <<-EOSQL
+        SELECT 'CREATE DATABASE "\$database" OWNER "\$user"'
+        WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_database WHERE datname = '\$database')\gexec
+        GRANT ALL PRIVILEGES ON DATABASE "\$database" TO "\$user";
+    EOSQL
+    }
+    echo "🚀 Starting database initialization..."
+    POSTGRES_USER="\${POSTGRES_USER:-postgres}"
+    create_user_and_database "keycloak" "keycloak" "\${KEYCLOAK_DB_PASSWORD}"
+    create_user_and_database "n8n" "n8n" "\${N8N_DB_PASSWORD}"
+    create_user_and_database "grafana" "grafana" "\${GRAFANA_DB_PASSWORD}"
+    echo "✅ Database initialization complete!"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgsql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgsql
+  template:
+    metadata:
+      labels:
+        app: pgsql
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: POSTGRES_PASSWORD
+        - name: KEYCLOAK_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: KEYCLOAK_DB_PASSWORD
+        - name: N8N_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: N8N_DB_PASSWORD
+        - name: GRAFANA_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: GRAFANA_DB_PASSWORD
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: pgsql-data
+          mountPath: /var/lib/postgresql/data
+        - name: pgsql-init
+          mountPath: /docker-entrypoint-initdb.d/init-databases.sh
+          subPath: init-databases.sh
+      volumes:
+      - name: pgsql-data
+        persistentVolumeClaim:
+          claimName: pgsql-pvc
+      - name: pgsql-init
+        configMap:
+          name: pgsql-init-scripts
+          defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgsql
+spec:
+  selector:
+    app: pgsql
+  ports:
+  - port: 5432
+    targetPort: 5432
