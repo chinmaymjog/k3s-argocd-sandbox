@@ -1,4 +1,4 @@
-.PHONY: help setup up down status
+.PHONY: help setup up down status secrets password
 
 CLUSTER_NAME ?= sandbox
 
@@ -6,6 +6,7 @@ help:
 	@echo "K3s ArgoCD Sandbox - Management Commands"
 	@echo "================================================"
 	@echo "up       - Create k3d cluster and install ArgoCD"
+	@echo "secrets  - Apply sandbox-secrets from local .env"
 	@echo "down     - Stop and delete the k3d cluster"
 	@echo "status   - Show status of the cluster and ArgoCD pods"
 	@echo "password - Retrieve the initial ArgoCD admin password"
@@ -17,6 +18,10 @@ up:
 	@echo "🚀 Sandbox is up!"
 	@echo "🌐 ArgoCD UI: http://argocd.127.0.0.1.nip.io"
 	@echo "🔑 Run 'make password' to get your login credentials."
+	@echo "🔐 Run 'make secrets' to apply secrets from local .env before bootstrap."
+
+secrets:
+	@bash scripts/apply-secrets.sh
 
 down:
 	@echo "🛑 Deleting k3d cluster '$(CLUSTER_NAME)'..."
