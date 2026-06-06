@@ -1,50 +1,59 @@
 # ☁️ K3s-ArgoCD Sandbox
-## A GitOps Local Cloud Architecture
+## A Production-Grade Local Cloud Architecture on Kubernetes
 
-A modular, automated infrastructure sandbox for testing cloud-native stacks, observability, and automation tools on your local machine using **K3s**, **ArgoCD**, and the **GitOps** paradigm.
+A modular, automated infrastructure sandbox for testing cloud-native stacks, observability, and automation tools on your laptop or a remote VM using K3s and ArgoCD.
 
 > [!TIP]
-> This lab mimics a production cloud environment built on top of Kubernetes, with modular application stacks synced automatically via ArgoCD.
+> This lab mimics a production cloud environment with modular stacks and unified ingress.
 
 ## 🏗️ Architecture: The "GitOps Cloud" Design
 
-Unlike standard local docker labs, **K3s-ArgoCD Sandbox** is built with a modern platform engineering mindset. It replaces imperative `docker-compose` commands with declarative Kubernetes manifests managed by ArgoCD.
+Like cloudops-sandbox, this project keeps ingress, control-plane logic, and modular application stacks. The runtime model shifts from Docker Compose to Kubernetes manifests synced by ArgoCD.
 
 ```mermaid
 graph TD
-    User([User]) -->|HTTPS / *.nip.io| Traefik[K3s Built-in Traefik]
-    
-    subgraph "Control Plane"
-        Traefik
-        ArgoCD[ArgoCD GitOps Engine]
-    end
+	User([User]) -->|HTTPS / *.nip.io| Traefik[K3s Traefik Ingress Gateway]
 
-    subgraph "Modular Stacks (Kubernetes)"
-        App1[Keycloak]
-        App2[n8n]
-        App3[Prometheus/Grafana]
-    end
+	subgraph "Control Plane Network"
+		Traefik
+		ArgoCD[ArgoCD GitOps Engine]
+		DNS[nip.io / optional DNS]
+	end
 
-    subgraph "Persistence Layer (PVCs)"
-        DB[(PostgreSQL / MySQL)]
-        Vol[(App Data Volumes)]
-    end
+	subgraph "Modular Stacks"
+		App1[Keycloak Stack]
+		App2[n8n Stack]
+		App3[Monitoring Stack]
+	end
 
-    ArgoCD -->|Syncs Manifests| App1
-    ArgoCD -->|Syncs Manifests| App2
-    ArgoCD -->|Syncs Manifests| App3
-    
-    Traefik --> App1
-    Traefik --> App2
-    Traefik --> App3
-    
-    App1 --> DB
-    App2 --> DB
+	subgraph "Persistence Layer"
+		DB[(PostgreSQL / MySQL)]
+		Vol[(Kubernetes PVCs)]
+	end
+
+	ArgoCD --> App1
+	ArgoCD --> App2
+	ArgoCD --> App3
+
+	Traefik --> App1
+	Traefik --> App2
+	Traefik --> App3
+
+	App1 --> DB
+	App2 --> DB
+
+	DB --> Vol
 ```
 
 ## 🚀 Overview
 
-This lab provides a "Sandboxed" Kubernetes environment. By utilizing `k3d`, we spin up a lightweight, fully functional K3s cluster. ArgoCD is then installed to automatically deploy all our infrastructure stacks directly from this Git repository.
+This lab provides a "Sandboxed" environment that mimics a production cloud setup. It allows rapid deployment of stateful tools and management stacks using K3s, Traefik, and ArgoCD as the GitOps control plane.
+
+## System Docs (Engineering Workflow)
+
+- Project specification: docs/project-spec.md
+- Architecture decisions: docs/architecture.md
+- Execution tracker: docs/tasks.md
 
 ---
 
@@ -52,23 +61,26 @@ This lab provides a "Sandboxed" Kubernetes environment. By utilizing `k3d`, we s
 
 ### System Requirements
 *   **Operating System**: macOS or Linux.
-*   **Tools**:
-    *   `docker` (Docker Desktop, Colima, or OrbStack)
-    *   `k3d` (via `brew install k3d`)
-    *   `kubectl` (via `brew install kubectl`)
-    *   `make`
+*   **Docker runtime**: Docker Desktop, Colima, or OrbStack.
+*   **Tools**: `k3d`, `kubectl`, `make`.
+
+Install example (macOS):
+
+```bash
+brew install k3d kubectl
+```
 
 ---
 
 ## 🏗️ Stack Catalog
 
-The sandbox automatically deploys the following modular stacks:
+The lab is organized into modular stacks:
 
 | Category | Tools | Description |
 | :--- | :--- | :--- |
 | **GitOps Engine** | ArgoCD | Continuous delivery and sync agent |
 | **Edge & Proxy** | Traefik | Built-in K3s ingress controller |
-| **SSL/TLS** | Cert-Manager | Automated Certificate provisioning |
+| **SSL/TLS** | Cert-Manager | Automated certificate provisioning |
 | **Observability** | Prometheus, Grafana | Metrics and Dashboards |
 | **Automation** | n8n | Low-code workflow automation |
 | **Databases** | PostgreSQL, MySQL | Stateful data persistence via PVCs |
@@ -80,99 +92,287 @@ The sandbox automatically deploys the following modular stacks:
 ## 🛠️ Quick Start
 
 ### 1. Fork & Clone
-ArgoCD requires a Git repository to sync manifests from. First, **fork** this repository, then clone it locally:
+ArgoCD should sync from your fork:
+
 ```bash
 git clone https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
 cd k3s-argocd-sandbox
 ```
 
-*(Note: You will need to update `argocd/bootstrap.yaml` to point to your fork's URL before committing).*
+Initialize local secret file:
 
-### 2. Setup Infrastructure
-Launch the K3s cluster and install ArgoCD:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your own secret values.
+
+### 2. Choose Setup Mode
+
+#### Mode A (Recommended): Local Laptop with nip.io
+Use local domain in this terminal:
+
+```bash
+export APP_DOMAIN=127.0.0.1.nip.io
+```
+
+Expected access examples:
+- `http://argocd.127.0.0.1.nip.io`
+- `https://grafana.127.0.0.1.nip.io`
+- `https://keycloak.127.0.0.1.nip.io`
+- `https://n8n.127.0.0.1.nip.io`
+
+Note: nip.io mode uses sandbox certificates, so browser certificate warnings are expected.
+
+#### Mode B: Remote VM with nip.io
+Use VM-based domain in this terminal:
+
+```bash
+export APP_DOMAIN=<VM_PUBLIC_IP>.nip.io
+```
+
+VM preflight:
+1. Open inbound ports `80` and `443` on the VM firewall/security group.
+2. Ensure Docker is running on the VM.
+
+Expected access examples:
+- `http://argocd.<VM_PUBLIC_IP>.nip.io`
+- `https://grafana.<VM_PUBLIC_IP>.nip.io`
+- `https://keycloak.<VM_PUBLIC_IP>.nip.io`
+- `https://n8n.<VM_PUBLIC_IP>.nip.io`
+
+#### Mode C (Optional Advanced): Public Domain
+Use this mode only if you want a custom DNS domain.
+
+Set in terminal:
+
+```bash
+export APP_DOMAIN=lab.yourdomain.com
+```
+
+Then update app ingress hosts from `127.0.0.1.nip.io` to your domain before bootstrap.
+
+### 3. Point Bootstrap to Your Fork
+Update `argocd/bootstrap.yaml` and set `spec.source.repoURL` to your fork URL:
+- `https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git`
+
+### 4. Update App Domains (Remote/Public Modes)
+Application manifests are currently checked in with `127.0.0.1.nip.io`.
+For remote or public domain modes, replace domain values in `apps/`:
+
+```bash
+find apps -type f -name "*.yaml" -exec sed -i.bak "s/127.0.0.1.nip.io/${APP_DOMAIN}/g" {} +
+find apps -type f -name "*.bak" -delete
+```
+
+### 5. Setup Infrastructure
+Create the K3s cluster and install ArgoCD:
+
 ```bash
 make up
 ```
 
-### 3. Retrieve Credentials
-Get your default ArgoCD admin password:
+### 6. Retrieve Credentials
+Get the default ArgoCD admin password:
+
 ```bash
 make password
 ```
 
-### 4. Deploy the Stacks
-Access the ArgoCD UI at `http://argocd.127.0.0.1.nip.io`. Log in with username `admin` and your retrieved password.
-Deploy the master application by applying the bootstrap manifest:
+Login username is `admin`.
+
+### 7. Apply Secrets (Local, User-Controlled)
+
+Apply Kubernetes secret from your local `.env`:
+
+```bash
+make secrets
+```
+
+### 8. Launch Stack
+Bootstrap all application manifests:
+
 ```bash
 kubectl apply -f argocd/bootstrap.yaml
 ```
-ArgoCD will immediately detect the `apps/` directory and begin spinning up PostgreSQL, Keycloak, Prometheus, and everything else!
+
+### 9. Verify Health
+
+```bash
+make status
+kubectl get ingress -A
+```
+
+### 10. First Login (Recommended)
+Start with ArgoCD dashboard:
+- `http://argocd.<APP_DOMAIN>`
+
+Then verify core apps:
+- `https://grafana.<APP_DOMAIN>`
+- `https://keycloak.<APP_DOMAIN>`
+- `https://n8n.<APP_DOMAIN>`
+
+### 11. Onboard a New App
+
+Use this flow for any new app manifest under `apps/<app-name>/`.
+
+#### 11.1 Create app manifest
+
+ArgoCD bootstraps `apps/` recursively, so any new manifest in that tree is synced automatically.
+
+Template (`apps/<app-name>/<app-name>.yaml`):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <app-name>
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: <app-name>
+  template:
+    metadata:
+      labels:
+        app: <app-name>
+    spec:
+      containers:
+        - name: <app-name>
+          image: <image-repo>:<tag>
+          ports:
+            - containerPort: 80
+          env:
+            - name: APP_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: APP_DOMAIN
+            - name: APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sandbox-secrets
+                  key: APP_DB_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: <app-name>
+  namespace: default
+spec:
+  selector:
+    app: <app-name>
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: <app-name>
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - <app-name>.<APP_DOMAIN>
+      secretName: <app-name>-tls
+  rules:
+    - host: <app-name>.<APP_DOMAIN>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: <app-name>
+                port:
+                  number: 80
+```
+
+#### 11.2 Add/update local secret values
+
+Add required keys to local `.env`, then apply:
+
+```bash
+make secrets
+```
+
+If the app needs a new key (example `APP_DB_PASSWORD`), add it to:
+
+- `.env.example`
+- `scripts/apply-secrets.sh` required keys list
+- your local `.env`
+
+#### 11.3 Commit and sync
+
+Commit and push the new manifest(s). ArgoCD then reconciles the cluster from Git.
+
+#### 11.4 Verify app rollout
+
+```bash
+kubectl rollout status deployment/<app-name> -n default --timeout=300s
+kubectl get pods -n default -l app=<app-name>
+kubectl get ingress <app-name> -n default
+```
+
+#### 11.5 DB-backed app extension (PostgreSQL/MySQL)
+
+When the app needs a dedicated DB/user:
+
+1. Add password key in local `.env` (example: `DEMO_DB_PASSWORD=...`).
+2. Add the same key in `.env.example` and `scripts/apply-secrets.sh`, then run `make secrets`.
+3. In `apps/pgsql/pgsql.yaml` or `apps/mysql/mysql.yaml`, add DB container env wiring from `sandbox-secrets`.
+4. Add provisioning line in DB init script ConfigMap:
+	 - PostgreSQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
+	 - MySQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
+5. Re-apply changed DB manifest and rollout restart DB deployment.
+6. Run init script in the running DB pod to provision new DB/user without resetting data.
+
+PostgreSQL validation:
+
+```bash
+kubectl exec -n default deployment/pgsql -- sh -lc 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '\''demo'\'';"; psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '\''demo'\'';"'
+```
+
+MySQL validation:
+
+```bash
+kubectl exec -n default deployment/mysql -- sh -lc 'mysql -N -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME=\"demo\"; SELECT User FROM mysql.user WHERE User=\"demo\";"'
+```
 
 ---
 
-## 🔐 Handling Environment Variables & Secrets in GitOps
+## 🔌 Optional Integrations
 
-Here is how variables are managed in this Kubernetes architecture:
+- Optional: replace plain Kubernetes Secrets with a secret manager flow (for example External Secrets or Sealed Secrets) when moving beyond local sandbox usage.
+- Optional: configure cert-manager with your preferred issuer for trusted public certificates.
 
-1. **Non-Sensitive Variables:** Standard configurations (like `DB_TYPE: postgres` or `TZ: UTC`) are defined directly in the `Deployment` manifests under the `env:` block.
-2. **Global Domains:** The ingress domain (`127.0.0.1.nip.io`) is defined directly in the `Ingress` resources. If you want to use a custom domain, you would run a find-and-replace across the YAML files and push the commit.
-3. **Sensitive Secrets:** Passwords and tokens are stored centrally in `apps/secrets.yaml` as base64 encoded strings. The Pods reference these securely using `valueFrom: secretKeyRef`. 
-4. **SSL Certificates:** We use `cert-manager` to automatically provision certificates for all ingresses. Locally, it generates Self-Signed certificates (expect a "Not Secure" browser warning, but traffic is encrypted). If you attach a public domain, you can easily swap the `apps/cert-manager/issuer.yaml` to an ACME Let's Encrypt issuer to get fully valid green padlocks!
+### Secure Remote Git Usage
 
-> [!WARNING]
-> Because this is a local sandbox, `apps/secrets.yaml` is committed to Git with dummy passwords (e.g., `password`). **Never commit real production secrets to a public Git repository.** For a production environment, you would replace `secrets.yaml` with a tool like **Sealed Secrets** or **External Secrets Operator** (fetching from AWS/Azure/Vault).
+For shared or public Git repositories:
 
----
+1. Do not commit real values to Git.
+2. Keep sensitive values only in local `.env` and apply via `make secrets`.
+3. For team/remote environments, use encrypted GitOps secrets:
+	- Sealed Secrets (recommended for this stack), or
+	- External Secrets Operator with a cloud secret manager.
 
-
-## 🧪 Testing & Validation
-
-The sandbox is designed to be environment-agnostic. Whether you are running on a local laptop or a remote VM, the GitOps workflow remains identical.
-
-### 1. Domain & Access Strategy
-
-| Scenario | Recommended Domain | Access Method |
-| :--- | :--- | :--- |
-| **Local Development** | `127.0.0.1.nip.io` | Automatic (via nip.io) |
-| **Remote VM (Public IP)** | `<VM_IP>.nip.io` | Automatic (via nip.io) |
-| **Public Domain** | `lab.yourdomain.com` | DNS Record (A or CNAME) |
-| **Offline / Internal** | `lab.local` | `/etc/hosts` entry |
-
-*(To change the domain for your stacks, run a global find-and-replace on `127.0.0.1.nip.io` in the `apps/` directory and commit to your fork. To change the ArgoCD dashboard URL during setup, simply run `APP_DOMAIN="my.domain.com" make up`).*
-
-### 2. Universal Deployment Flow
-To deploy on **any** machine (Local or Remote):
-1.  **Fork & Clone**: Fork this repo and clone it locally.
-2.  **Cluster Setup**: Run `make up` to build the K3s cluster. *(Or run `APP_DOMAIN="my.domain" make up`)*.
-3.  **GitOps Sync**: Run `kubectl apply -f argocd/bootstrap.yaml`.
-
-### 3. Remote VM Deployment
-The sandbox is designed to be environment-agnostic. To deploy on a remote VM:
-1.  **Fork & Clone**: Fork this repo and clone it onto your VM.
-2.  **Configure Domain**: Replace all instances of `127.0.0.1.nip.io` with your VM's IP address (e.g., `<VM_IP>.nip.io`).
-3.  **Launch**: Run `make up` and apply your bootstrap manifest.
+Current baseline in this repo keeps secret values out of tracked manifests and in user-controlled local env files.
 
 ---
 
-## ➕ How to Add a New App
+## 🧰 Helpful Commands
 
-Adding a new tool to the GitOps flow is standardized:
-
-1.  **Create Directory**: `mkdir -p apps/my-new-tool`
-2.  **Add Manifests**: Create your `Deployment`, `Service`, and `Ingress` YAML files. Ensure the ingress uses your domain.
-3.  **Commit & Push**: Commit the new folder to your GitHub fork.
-4.  **Auto-Sync**: ArgoCD will detect the change within 3 minutes and automatically apply it!
-
-### Apps that require a Database
-If your new app needs a PostgreSQL or MySQL database:
-1. Add your new database password to `apps/secrets.yaml`.
-2. Add your password as an environment variable in `apps/pgsql/pgsql.yaml` under the `postgres` container `env:` section.
-3. In the same `pgsql.yaml` file, scroll up to the `pgsql-init-scripts` ConfigMap and add a new line at the bottom: `create_user_and_database "myapp" "myapp" "\${MYAPP_DB_PASSWORD}"`
-4. Commit and push your changes.
-5. **Apply it to the live database:** Because database init-scripts only run automatically on the *first* boot of a new volume, you need to manually trigger the script to create your new database without wiping your existing data:
-   ```bash
-   kubectl exec -it deployment/pgsql -- bash /docker-entrypoint-initdb.d/init-databases.sh
-   ```
+```bash
+make up        # create k3d cluster and install ArgoCD
+make down      # stop and delete the k3d cluster
+make status    # cluster and pod status snapshot
+make password  # print ArgoCD admin password
+```
 
 ---
 *Maintained by [Chinmay Jog](https://github.com/chinmaymjog) | 📖 [Read my articles on Medium](https://medium.com/@chinmaymjog)*
