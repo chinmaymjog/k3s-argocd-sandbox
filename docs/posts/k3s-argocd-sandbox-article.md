@@ -8,7 +8,7 @@ As a Cloud Infrastructure Architect, local testing is critical. A while ago, I b
 
 You need Kubernetes, and more importantly, you need **GitOps**.
 
-I wanted to take my local lab to the next level. I wanted a lightweight Kubernetes cluster, automated deployments driven entirely by Git, seamless SSL provisioning, and declarative state management. 
+I wanted to take my local lab to the next level. I wanted a lightweight Kubernetes cluster, automated deployments driven by Git, unified ingress, and declarative state management.
 
 This is how I built the **K3s-ArgoCD Sandbox**—a fully functional GitOps cloud running right on my laptop.
 
@@ -53,11 +53,13 @@ graph TD
 ```
 
 #### 🏗️ The App-of-Apps Pattern
-By installing ArgoCD into a lightweight K3s cluster (via `k3d`), I implemented the **App-of-Apps** pattern. A single `bootstrap.yaml` manifest tells ArgoCD to watch the `apps/` directory in my repository. When I push a new Kubernetes Deployment or Ingress to GitHub, ArgoCD detects it and automatically syncs the state to the cluster. No manual intervention required.
+By installing ArgoCD into a lightweight K3s cluster (via `k3d`), I implemented the **App-of-Apps** pattern. A single `bootstrap.yaml` manifest tells ArgoCD to watch the `apps/` directory in the repository. When a new Kubernetes Deployment or Ingress is committed to Git, ArgoCD can reconcile the cluster state to match.
+
+In practice, local bootstrap still includes a few explicit operator steps: point ArgoCD at your fork, apply local secrets, and then bootstrap the apps. That keeps the flow simple without pretending the first-run experience is fully automatic.
 
 #### 🛡️ Unified Ingress & Cert-Manager
 Accessing services via `NodePort` is a friction point. I utilized the built-in Traefik ingress controller that ships with K3s.
-- **Automated SSL**: I integrated `cert-manager` with a self-signed `ClusterIssuer`. Every ingress automatically provisions its own TLS certificate.
+- **Automated TLS for the sandbox**: `cert-manager` is available for certificate workflows, while the repo README documents the local `nip.io` flow and the extra steps needed if you want to move to a custom domain.
 - **Zero-Config Routing**: I used **nip.io** for instant, domain-based routing (e.g., `https://grafana.127.0.0.1.nip.io`) without manual DNS or `/etc/hosts` edits.
 
 #### 🐘 Idempotent Database Bootstrapping
@@ -65,14 +67,17 @@ One of the hardest parts of a local Kubernetes lab is managing database credenti
 - **On-Initial-Boot**: Scripts mounted via ConfigMaps into `/docker-entrypoint-initdb.d` provision all databases and users automatically when the Persistent Volume Claim (PVC) is first created.
 - **Idempotency**: Using `IF NOT EXISTS` logic means you can manually re-trigger the script inside the pod to add a new app database on the fly without destroying existing data.
 
+The current repo also separates secret values from tracked manifests. Local users keep values in `.env`, apply them through `make secrets`, and can later move to a GitOps-safe encrypted secret pattern for remote or shared environments.
+
 ---
 
 ### Key Technical Features
 - **Server-Side Apply**: Working with massive CRDs (like ArgoCD's ApplicationSet) often breaks standard `kubectl apply` due to annotation size limits. I automated the ArgoCD installation using `--server-side --force-conflicts` to guarantee a smooth bootstrap.
-- **Centralized Secrets**: Passwords and tokens are stored centrally in a Kubernetes Secret, allowing all pods to inject credentials securely via `secretKeyRef`.
+- **User-Controlled Local Secrets**: Passwords and tokens are supplied from a local `.env` file and applied into `sandbox-secrets`, keeping real values out of tracked manifests.
 - **Developer Experience (DX)**: The entire lifecycle is abstracted via a minimalist Makefile:
     - `make up`: Spin up the K3s cluster and install ArgoCD.
     - `make password`: Fetch the initial ArgoCD admin password.
+    - `make secrets`: Apply local secret values into the cluster.
     - `kubectl apply -f argocd/bootstrap.yaml`: Kick off the automated GitOps sync.
 
 ---
@@ -85,6 +90,8 @@ For a Cloud Architect or DevOps Engineer, building a GitOps workflow from scratc
 ### Check out the Project
 The full source code and setup instructions are available on GitHub:
 👉 **[K3s-ArgoCD-Sandbox on GitHub](https://github.com/chinmaymjog/k3s-argocd-sandbox)**
+
+Start with the README for the current local or remote setup flow, then use the docs set for architecture notes and tracked tasks.
 
 ---
 *About the Author: Chinmay Jog is a Cloud Infrastructure Architect and DevOps Engineer. He specializes in building automated, secure, and developer-friendly infrastructure solutions.*
