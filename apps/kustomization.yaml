@@ -1,0 +1,105 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - adminer/adminer.yaml
+  - cert-manager/issuer.yaml
+  - grafana/grafana.yaml
+  - keycloak/keycloak.yaml
+  - mysql/mysql.yaml
+  - n8n/n8n.yaml
+  - pgsql/pgsql.yaml
+  - phpmyadmin/phpmyadmin.yaml
+  - prometheus/prometheus.yaml
+configMapGenerator:
+  - name: sandbox-runtime
+    envs:
+      - runtime.env
+generatorOptions:
+  disableNameSuffixHash: true
+replacements:
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.ADMINER_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: adminer
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.GRAFANA_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: grafana
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.KEYCLOAK_HOST
+    targets:
+      - select:
+          kind: Deployment
+          name: keycloak
+        fieldPaths:
+          - spec.template.spec.containers.[name=keycloak].env.[name=KC_HOSTNAME].value
+      - select:
+          kind: Ingress
+          name: keycloak
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.N8N_HOST
+    targets:
+      - select:
+          kind: Deployment
+          name: n8n
+        fieldPaths:
+          - spec.template.spec.containers.[name=n8n].env.[name=N8N_HOST].value
+      - select:
+          kind: Ingress
+          name: n8n
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.N8N_WEBHOOK_URL
+    targets:
+      - select:
+          kind: Deployment
+          name: n8n
+        fieldPaths:
+          - spec.template.spec.containers.[name=n8n].env.[name=WEBHOOK_URL].value
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.PHPMYADMIN_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: phpmyadmin
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.PROMETHEUS_HOST
+    targets:
+      - select:
+          kind: Ingress
+          name: prometheus
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0

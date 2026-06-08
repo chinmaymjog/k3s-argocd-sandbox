@@ -60,14 +60,15 @@ This lab provides a "Sandboxed" environment that mimics a production cloud setup
 ## 📋 Prerequisites
 
 ### System Requirements
-*   **Operating System**: macOS or Linux.
-*   **Docker runtime**: Docker Desktop, Colima, or OrbStack.
-*   **Tools**: `k3d`, `kubectl`, `make`.
+*   **Operating System**: Linux host or Linux VM with `systemd` and `sudo`.
+*   **Tools**: `curl`, `kubectl`, `make`.
+*   **Ports**: `80` and `443` available on the host for Traefik ingress.
 
-Install example (macOS):
+Install example (Debian/Ubuntu):
 
 ```bash
-brew install k3d kubectl
+sudo apt-get update
+sudo apt-get install -y curl make
 ```
 
 ---
@@ -107,13 +108,24 @@ cp .env.example .env
 
 Edit `.env` with your own secret values.
 
-### 2. Choose Setup Mode
+### 2. Write Runtime Config
 
-#### Mode A (Recommended): Local Laptop with nip.io
-Use local domain in this terminal:
+Generate the tracked runtime config once for your environment:
 
 ```bash
-export APP_DOMAIN=127.0.0.1.nip.io
+make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
+```
+
+This writes `config/runtime.env`, then syncs the Kustomize runtime files under `apps/` and `argocd/`.
+Commit all three runtime files so ArgoCD reconciles the same domain and repo settings you bootstrapped with.
+
+### 3. Choose Setup Mode
+
+#### Mode A (Recommended): Local Laptop with nip.io
+Recommended configure command:
+
+```bash
+make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
 ```
 
 Expected access examples:
@@ -125,15 +137,15 @@ Expected access examples:
 Note: nip.io mode uses sandbox certificates, so browser certificate warnings are expected.
 
 #### Mode B: Remote VM with nip.io
-Use VM-based domain in this terminal:
+Recommended configure command:
 
 ```bash
-export APP_DOMAIN=<VM_PUBLIC_IP>.nip.io
+make configure APP_DOMAIN=<VM_PUBLIC_IP>.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
 ```
 
 VM preflight:
 1. Open inbound ports `80` and `443` on the VM firewall/security group.
-2. Ensure Docker is running on the VM.
+2. Ensure ports `80` and `443` are available on the VM host.
 
 Expected access examples:
 - `http://argocd.<VM_PUBLIC_IP>.nip.io`
@@ -144,35 +156,25 @@ Expected access examples:
 #### Mode C (Optional Advanced): Public Domain
 Use this mode only if you want a custom DNS domain.
 
-Set in terminal:
+Recommended configure command:
 
 ```bash
-export APP_DOMAIN=lab.yourdomain.com
+make configure APP_DOMAIN=lab.yourdomain.com REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
 ```
 
-Then update app ingress hosts from `127.0.0.1.nip.io` to your domain before bootstrap.
-
-### 3. Point Bootstrap to Your Fork
-Update `argocd/bootstrap.yaml` and set `spec.source.repoURL` to your fork URL:
-- `https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git`
-
-### 4. Update App Domains (Remote/Public Modes)
-Application manifests are currently checked in with `127.0.0.1.nip.io`.
-For remote or public domain modes, replace domain values in `apps/`:
+### 4. Setup Infrastructure
+Install or reuse K3s on the host, apply local secrets, and bootstrap ArgoCD:
 
 ```bash
-find apps -type f -name "*.yaml" -exec sed -i.bak "s/127.0.0.1.nip.io/${APP_DOMAIN}/g" {} +
-find apps -type f -name "*.bak" -delete
+make bootstrap
 ```
 
-### 5. Setup Infrastructure
-Create the K3s cluster and install ArgoCD:
+This performs:
+- `make up`
+- `make secrets`
+- `make sync`
 
-```bash
-make up
-```
-
-### 6. Retrieve Credentials
+### 5. Retrieve Credentials
 Get the default ArgoCD admin password:
 
 ```bash
@@ -181,42 +183,28 @@ make password
 
 Login username is `admin`.
 
-### 7. Apply Secrets (Local, User-Controlled)
-
-Apply Kubernetes secret from your local `.env`:
-
-```bash
-make secrets
-```
-
-### 8. Launch Stack
-Bootstrap all application manifests:
-
-```bash
-kubectl apply -f argocd/bootstrap.yaml
-```
-
-### 9. Verify Health
+### 6. Verify Health
 
 ```bash
 make status
 kubectl get ingress -A
+kubectl get application sandbox-apps -n argocd
 ```
 
-### 10. First Login (Recommended)
+### 7. First Login (Recommended)
 Start with ArgoCD dashboard:
-- `http://argocd.<APP_DOMAIN>`
+- `http://argocd.<your-domain>`
 
 Then verify core apps:
-- `https://grafana.<APP_DOMAIN>`
-- `https://keycloak.<APP_DOMAIN>`
-- `https://n8n.<APP_DOMAIN>`
+- `https://grafana.<your-domain>`
+- `https://keycloak.<your-domain>`
+- `https://n8n.<your-domain>`
 
-### 11. Onboard a New App
+### 8. Onboard a New App
 
 Use this flow for any new app manifest under `apps/<app-name>/`.
 
-#### 11.1 Create app manifest
+#### 8.1 Create app manifest
 
 ArgoCD bootstraps `apps/` recursively, so any new manifest in that tree is synced automatically.
 
@@ -244,11 +232,6 @@ spec:
           ports:
             - containerPort: 80
           env:
-            - name: APP_DOMAIN
-              valueFrom:
-                secretKeyRef:
-                  name: sandbox-secrets
-                  key: APP_DOMAIN
             - name: APP_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -278,10 +261,10 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - <app-name>.<APP_DOMAIN>
+        - <app-name>.<your-domain>
       secretName: <app-name>-tls
   rules:
-    - host: <app-name>.<APP_DOMAIN>
+    - host: <app-name>.<your-domain>
       http:
         paths:
           - path: /
@@ -293,7 +276,9 @@ spec:
                   number: 80
 ```
 
-#### 11.2 Add/update local secret values
+If the app exposes a host, add a matching replacement entry in `apps/kustomization.yaml` and a corresponding host value in `config/runtime.env`.
+
+#### 8.2 Add/update local secret values
 
 Add required keys to local `.env`, then apply:
 
@@ -307,11 +292,11 @@ If the app needs a new key (example `APP_DB_PASSWORD`), add it to:
 - `scripts/apply-secrets.sh` required keys list
 - your local `.env`
 
-#### 11.3 Commit and sync
+#### 8.3 Commit and sync
 
-Commit and push the new manifest(s). ArgoCD then reconciles the cluster from Git.
+Commit and push the manifest changes together with any runtime file changes in `config/`, `apps/`, and `argocd/`. ArgoCD then reconciles the cluster from Git.
 
-#### 11.4 Verify app rollout
+#### 8.4 Verify app rollout
 
 ```bash
 kubectl rollout status deployment/<app-name> -n default --timeout=300s
@@ -319,7 +304,7 @@ kubectl get pods -n default -l app=<app-name>
 kubectl get ingress <app-name> -n default
 ```
 
-#### 11.5 DB-backed app extension (PostgreSQL/MySQL)
+#### 8.5 DB-backed app extension (PostgreSQL/MySQL)
 
 When the app needs a dedicated DB/user:
 
@@ -368,8 +353,10 @@ Current baseline in this repo keeps secret values out of tracked manifests and i
 ## 🧰 Helpful Commands
 
 ```bash
-make up        # create k3d cluster and install ArgoCD
-make down      # stop and delete the k3d cluster
+make up        # install or reuse k3s and install ArgoCD
+make bootstrap # install k3s, apply secrets, and bootstrap ArgoCD apps
+make sync      # re-apply the ArgoCD bootstrap application
+make down CONFIRM_K3S_UNINSTALL=true  # uninstall k3s from the host
 make status    # cluster and pod status snapshot
 make password  # print ArgoCD admin password
 ```

@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  - bootstrap.yaml
+configMapGenerator:
+  - name: sandbox-runtime
+    envs:
+      - runtime.env
+generatorOptions:
+  disableNameSuffixHash: true
+replacements:
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.REPO_URL
+    targets:
+      - select:
+          kind: Application
+          name: sandbox-apps
+        fieldPaths:
+          - spec.source.repoURL
+  - source:
+      kind: ConfigMap
+      name: sandbox-runtime
+      fieldPath: data.TARGET_REVISION
+    targets:
+      - select:
+          kind: Application
+          name: sandbox-apps
+        fieldPaths:
+          - spec.source.targetRevision

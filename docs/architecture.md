@@ -23,6 +23,7 @@ K3s-ArgoCD Sandbox provides a local-cloud style Kubernetes environment for valid
 
 - Keep cluster lifecycle simple and repeatable via Make and scripts.
 - Keep app delivery declarative and repository-driven through ArgoCD sync.
+- Keep bootstrap and GitOps runtime inputs aligned through a tracked runtime config file.
 
 ## High-Level Design
 
@@ -30,8 +31,9 @@ K3s-ArgoCD Sandbox provides a local-cloud style Kubernetes environment for valid
 
 | Component | Responsibility | Owner |
 | --------- | -------------- | ----- |
-| k3d/K3s Cluster | Local Kubernetes runtime for sandbox apps | Platform Team |
+| K3s Cluster | Host Kubernetes runtime for sandbox apps | Platform Team |
 | ArgoCD | GitOps sync engine for manifests in apps/ | Platform Team |
+| config/runtime.env | Shared non-secret runtime inputs for bootstrap and ArgoCD | Platform Team |
 | apps/ Manifests | Modular app deployment definitions | Platform Team |
 | Ingress (Traefik) | Host-based routing for app endpoints | Platform Team |
 
@@ -44,10 +46,11 @@ See high-level architecture diagram in README.md.
 ### Request/Response Flow
 
 1. User starts environment via make up.
-2. k3d cluster is created and ArgoCD is installed.
-3. User applies argocd/bootstrap.yaml.
-4. ArgoCD syncs manifests from apps/ path.
-5. User accesses apps through host-based ingress endpoints.
+2. User writes config/runtime.env through make configure.
+3. k3s is installed or reused on the host and ArgoCD is installed.
+4. User runs make bootstrap, which applies secrets and the ArgoCD bootstrap application.
+5. ArgoCD syncs the apps/ Kustomize tree using the same runtime config files committed in Git.
+6. User accesses apps through host-based ingress endpoints.
 
 ### State and Data Model Notes
 
@@ -57,6 +60,7 @@ See high-level architecture diagram in README.md.
 ### Failure Paths
 
 - Bootstrap source repo mismatch prevents app sync.
+- Runtime domain drift between bootstrap and checked-in manifests prevents healthy sync.
 - Ingress/domain mismatch causes endpoint unreachability.
 - Storage class or PVC issues block stateful workload startup.
 
@@ -69,7 +73,7 @@ See high-level architecture diagram in README.md.
 
 ### Runtime Topology
 
-- Single k3d-hosted K3s cluster.
+- Single-host K3s cluster.
 - ArgoCD controller in argocd namespace.
 - App workloads in default and app-specific namespaces.
 
@@ -96,8 +100,7 @@ See high-level architecture diagram in README.md.
 
 | Dependency | Purpose | SLA/Risk | Backup Plan |
 | ---------- | ------- | -------- | ----------- |
-| Docker runtime | Host container runtime for k3d | Local daemon instability | Restart daemon and rerun lifecycle |
-| k3d | K3s cluster bootstrap | Version compatibility drift | Pin/test known compatible versions |
+| k3s install script | Cluster bootstrap | Installer or service failure | Re-run install and inspect `systemctl status k3s` |
 | nip.io/public DNS | Hostname routing | DNS and certificate setup mismatch | Use local host mapping fallback for testing |
 
 ## Architecture Decision Records (ADR-lite)
@@ -129,7 +132,7 @@ See high-level architecture diagram in README.md.
 ## Lightweight Traceability
 
 - FR-001 -> Makefile lifecycle and scripts/ automation -> ADR-001
-- FR-002 -> argocd/bootstrap.yaml and apps/ sync model -> ADR-001
+- FR-002 -> argocd/bootstrap.yaml, argocd/kustomization.yaml, and apps/ sync model -> ADR-001
 - FR-003 -> Traefik ingress host rules in app manifests -> ADR-002
 - FR-004 -> apps/<name>/ modular manifest pattern -> ADR-002
 - FR-005 -> README setup flows for local and remote usage -> ADR-001
