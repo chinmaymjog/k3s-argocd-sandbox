@@ -5,6 +5,8 @@ BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME_FILE="$BASE_DIR/config/runtime.env"
 APPS_RUNTIME_FILE="$BASE_DIR/apps/runtime.env"
 ARGOCD_RUNTIME_FILE="$BASE_DIR/argocd/runtime.env"
+IMAGES_FILE="$BASE_DIR/config/images.env"
+APPS_IMAGES_FILE="$BASE_DIR/apps/images.env"
 
 if [[ ! -f "$RUNTIME_FILE" ]]; then
   echo "❌ Missing runtime config at $RUNTIME_FILE"
@@ -19,6 +21,17 @@ for mirror in "$APPS_RUNTIME_FILE" "$ARGOCD_RUNTIME_FILE"; do
     exit 1
   fi
 done
+
+if [[ ! -f "$IMAGES_FILE" ]]; then
+  echo "❌ Missing image config at $IMAGES_FILE"
+  exit 1
+fi
+
+if [[ ! -f "$APPS_IMAGES_FILE" ]]; then
+  echo "❌ Missing Kustomize image config at $APPS_IMAGES_FILE"
+  echo "   Run: make configure APP_DOMAIN=<domain> REPO_URL=<repo-url>"
+  exit 1
+fi
 
 set -a
 # shellcheck disable=SC1090
@@ -46,4 +59,27 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-echo "✅ Runtime config is valid"
+set -a
+# shellcheck disable=SC1090
+source "$IMAGES_FILE"
+set +a
+
+required_images=(
+  ADMINER_IMAGE
+  GRAFANA_IMAGE
+  KEYCLOAK_IMAGE
+  MYSQL_IMAGE
+  N8N_IMAGE
+  PGSQL_IMAGE
+  PHPMYADMIN_IMAGE
+  PROMETHEUS_IMAGE
+)
+
+for var in "${required_images[@]}"; do
+  if [[ -z "${!var:-}" ]]; then
+    echo "❌ Required image variable '$var' is missing or empty in $IMAGES_FILE"
+    exit 1
+  fi
+done
+
+echo "✅ Runtime and image config are valid"

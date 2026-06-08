@@ -14,6 +14,9 @@ configMapGenerator:
   - name: sandbox-runtime
     envs:
       - runtime.env
+  - name: sandbox-images
+    envs:
+      - images.env
 generatorOptions:
   disableNameSuffixHash: true
 replacements:
@@ -103,3 +106,83 @@ replacements:
         fieldPaths:
           - spec.rules.0.host
           - spec.tls.0.hosts.0
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.ADMINER_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: adminer
+        fieldPaths:
+          - spec.template.spec.containers.[name=adminer].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.GRAFANA_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: grafana
+        fieldPaths:
+          - spec.template.spec.containers.[name=grafana].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.KEYCLOAK_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: keycloak
+        fieldPaths:
+          - spec.template.spec.containers.[name=keycloak].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.MYSQL_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: mysql
+        fieldPaths:
+          - spec.template.spec.containers.[name=mysql].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.N8N_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: n8n
+        fieldPaths:
+          - spec.template.spec.containers.[name=n8n].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.PGSQL_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: pgsql
+        fieldPaths:
+          - spec.template.spec.containers.[name=postgres].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.PHPMYADMIN_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: phpmyadmin
+        fieldPaths:
+          - spec.template.spec.containers.[name=phpmyadmin].image
+  - source:
+      kind: ConfigMap
+      name: sandbox-images
+      fieldPath: data.PROMETHEUS_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: prometheus
+        fieldPaths:
+          - spec.template.spec.containers.[name=prometheus].image

@@ -14,8 +14,8 @@ export K3S_VERSION
 help:
 	@echo "K3s ArgoCD Sandbox - Management Commands"
 	@echo "================================================"
-	@echo "configure - Write config/runtime.env from APP_DOMAIN/REPO_URL/TARGET_REVISION"
-	@echo "check-config - Validate config/runtime.env"
+	@echo "configure - Write runtime config and sync image/runtime Kustomize mirrors"
+	@echo "check-config - Validate runtime and image config files"
 	@echo "up       - Install or reuse k3s and install ArgoCD"
 	@echo "bootstrap - Configure cluster, secrets, and ArgoCD app-of-apps"
 	@echo "sync     - Apply the ArgoCD bootstrap application"
