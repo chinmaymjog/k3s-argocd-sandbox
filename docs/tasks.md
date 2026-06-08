@@ -55,7 +55,7 @@ Use this for ideas or deferred work.
 | T-002 | 2026-06-06 | FR-002,FR-003,NFR-002 | docs/architecture.md created | Added ADR baseline and traceability |
 | T-003 | 2026-06-06 | FR-005,NFR-002 | docs/tasks.md created | Added lightweight execution tracker |
 | T-004 | 2026-06-06 | FR-005,NFR-001 | README aligned to cloudops flow; architecture diagram, stack catalog, and setup modes verified | End-user-first flow restored for local/remote Kubernetes setup |
-| T-005 | 2026-06-06 | FR-001,FR-002,NFR-002 | `make up` succeeded, `kubectl apply -f argocd/bootstrap.yaml`, `kubectl wait --for=condition=Available deployment --all -n default --timeout=600s`, final `kubectl get application sandbox-apps -n argocd` = Synced/Healthy | Clean cluster bootstrap and app sync path validated |
+| T-005 | 2026-06-06 | FR-001,FR-002,NFR-002 | `make up` succeeded, `kubectl apply -k argocd`, `kubectl wait --for=condition=Available deployment --all -n default --timeout=600s`, final `kubectl get application sandbox-apps -n argocd` = Synced/Healthy | Clean cluster bootstrap and app sync path validated |
 
 ## Blocked
 

@@ -1,39 +1,53 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
-CLUSTER_NAME="sandbox"
+K3S_KUBECONFIG="${K3S_KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+SUDO=""
 
-# Check if k3d is installed
-if ! command -v k3d &> /dev/null; then
-    echo "❌ Error: k3d is not installed. Please install it first (e.g., 'brew install k3d')."
+if [[ "${EUID}" -ne 0 ]]; then
+    SUDO="sudo"
+fi
+
+if ! command -v curl &> /dev/null; then
+    echo "❌ Error: curl is not installed. Please install it first."
     exit 1
 fi
 
-# Check if kubectl is installed
-if ! command -v kubectl &> /dev/null; then
-    echo "❌ Error: kubectl is not installed. Please install it first (e.g., 'brew install kubectl')."
+if ! command -v systemctl &> /dev/null; then
+    echo "❌ Error: systemctl is required to manage the k3s service."
     exit 1
 fi
 
-# Check if cluster already exists
-if k3d cluster list | grep -q "$CLUSTER_NAME"; then
-    echo "⚠️ Cluster '$CLUSTER_NAME' already exists. Skipping creation."
+if command -v k3s &> /dev/null; then
+    echo "⚠️ k3s is already installed. Skipping installation."
 else
-    echo "🚀 Creating k3d cluster '$CLUSTER_NAME'..."
-    # Map ports 80 and 443 to the host load balancer for ingress
-    k3d cluster create "$CLUSTER_NAME" \
-        --port "80:80@loadbalancer" \
-        --port "443:443@loadbalancer"
-    
-    echo "✅ Cluster '$CLUSTER_NAME' created and ready!"
+    echo "🚀 Installing k3s..."
+    install_args=(server --write-kubeconfig-mode 644)
+    if [[ -n "${K3S_TLS_SAN:-}" ]]; then
+        install_args+=(--tls-san "${K3S_TLS_SAN}")
+    fi
+
+    curl -sfL https://get.k3s.io | ${SUDO} sh -s - "${install_args[@]}"
+    echo "✅ k3s installed."
 fi
 
-# Wait for Traefik to be ready (k3s built-in)
+if [[ -f "${K3S_KUBECONFIG}" && -z "${KUBECONFIG:-}" ]]; then
+    export KUBECONFIG="${K3S_KUBECONFIG}"
+fi
+
+if ! command -v kubectl &> /dev/null; then
+    echo "❌ Error: kubectl is not available after k3s installation."
+    exit 1
+fi
+
+echo "⏳ Ensuring k3s is running..."
+${SUDO} systemctl enable --now k3s
+
 echo "⏳ Waiting for built-in Traefik to initialize..."
-kubectl -n kube-system rollout status deployment traefik || true
+kubectl -n kube-system rollout status deployment traefik --timeout=300s || true
 
 echo "🔒 Installing Cert-Manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
 
 echo "⏳ Waiting for Cert-Manager webhook to be ready..."
-kubectl rollout status deployment cert-manager-webhook -n cert-manager
+kubectl rollout status deployment cert-manager-webhook -n cert-manager --timeout=300s

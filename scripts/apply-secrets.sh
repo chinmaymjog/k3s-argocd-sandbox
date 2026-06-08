@@ -4,6 +4,10 @@ set -Eeuo pipefail
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$BASE_DIR/.env"
 
+if [[ -z "${KUBECONFIG:-}" && -f /etc/rancher/k3s/k3s.yaml ]]; then
+  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "❌ Missing .env file at $ENV_FILE"
   echo "   Run: cp .env.example .env"
