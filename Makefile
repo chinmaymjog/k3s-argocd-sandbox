@@ -4,10 +4,12 @@ KUBECONFIG ?= /etc/rancher/k3s/k3s.yaml
 APP_DOMAIN ?= 127.0.0.1.nip.io
 REPO_URL ?= https://github.com/chinmayjog/k3s-argocd-sandbox.git
 TARGET_REVISION ?= main
+K3S_VERSION ?= v1.36.1+k3s1
 export KUBECONFIG
 export APP_DOMAIN
 export REPO_URL
 export TARGET_REVISION
+export K3S_VERSION
 
 help:
 	@echo "K3s ArgoCD Sandbox - Management Commands"
@@ -21,6 +23,7 @@ help:
 	@echo "down     - Uninstall k3s from this host (set CONFIRM_K3S_UNINSTALL=true)"
 	@echo "status   - Show status of the cluster and ArgoCD pods"
 	@echo "password - Retrieve the initial ArgoCD admin password"
+	@echo "Variables: K3S_VERSION=$(K3S_VERSION) APP_DOMAIN=$(APP_DOMAIN) TARGET_REVISION=$(TARGET_REVISION)"
 
 configure:
 	@bash scripts/configure-runtime.sh

@@ -44,6 +44,7 @@
 - User has forked repository when using ArgoCD bootstrap against personal repo URL.
 - Domain strategy is available through nip.io or public DNS.
 - Non-secret runtime settings are committed in-repo so ArgoCD and local bootstrap use the same values.
+- The repository pins a tested K3s release by default and allows explicit version override.
 
 # Risks
 
