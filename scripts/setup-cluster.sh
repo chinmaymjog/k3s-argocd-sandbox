@@ -44,7 +44,13 @@ echo "⏳ Ensuring k3s is running..."
 ${SUDO} systemctl enable --now k3s
 
 echo "⏳ Waiting for built-in Traefik to initialize..."
-kubectl -n kube-system rollout status deployment traefik --timeout=300s || true
+for _ in $(seq 1 60); do
+    if kubectl -n kube-system get deployment traefik >/dev/null 2>&1; then
+        kubectl -n kube-system rollout status deployment traefik --timeout=300s
+        break
+    fi
+    sleep 2
+done
 
 echo "🔒 Installing Cert-Manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
