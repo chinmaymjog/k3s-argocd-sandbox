@@ -37,8 +37,6 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-kubectl create namespace default --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
 kubectl -n default create secret generic sandbox-secrets \
   --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
   --from-literal=MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
