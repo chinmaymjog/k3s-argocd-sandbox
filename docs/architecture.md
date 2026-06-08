@@ -100,7 +100,7 @@ See high-level architecture diagram in README.md.
 
 | Dependency | Purpose | SLA/Risk | Backup Plan |
 | ---------- | ------- | -------- | ----------- |
-| k3s install script | Cluster bootstrap | Installer or service failure | Re-run install and inspect `systemctl status k3s` |
+| k3s install script + pinned K3S_VERSION | Cluster bootstrap | Installer or release asset failure | Re-run install, inspect `systemctl status k3s`, or override `K3S_VERSION` |
 | nip.io/public DNS | Hostname routing | DNS and certificate setup mismatch | Use local host mapping fallback for testing |
 
 ## Architecture Decision Records (ADR-lite)
