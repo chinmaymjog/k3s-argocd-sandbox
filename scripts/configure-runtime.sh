@@ -5,6 +5,8 @@ BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME_FILE="$BASE_DIR/config/runtime.env"
 APPS_RUNTIME_FILE="$BASE_DIR/apps/runtime.env"
 ARGOCD_RUNTIME_FILE="$BASE_DIR/argocd/runtime.env"
+IMAGES_FILE="$BASE_DIR/config/images.env"
+APPS_IMAGES_FILE="$BASE_DIR/apps/images.env"
 
 current_value() {
   local key="$1"
@@ -43,4 +45,8 @@ write_runtime_file "$APPS_RUNTIME_FILE"
 write_runtime_file "$ARGOCD_RUNTIME_FILE"
 
 echo "✅ Wrote runtime config to $RUNTIME_FILE"
+if [[ -f "$IMAGES_FILE" ]]; then
+  cp "$IMAGES_FILE" "$APPS_IMAGES_FILE"
+  echo "✅ Synced image config to $APPS_IMAGES_FILE"
+fi
 echo "✅ Synced Kustomize runtime config to $APPS_RUNTIME_FILE and $ARGOCD_RUNTIME_FILE"

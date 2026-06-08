@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: adminer
-        image: adminer:latest
+        image: adminer:5.4.2
         env:
         - name: ADMINER_DEFAULT_SERVER
           value: "pgsql"
