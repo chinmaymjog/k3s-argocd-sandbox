@@ -120,6 +120,9 @@ make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USER
 This writes `config/runtime.env`, then syncs the Kustomize runtime files under `apps/` and `argocd/`.
 Commit all three runtime files so ArgoCD reconciles the same domain and repo settings you bootstrapped with.
 
+Image versions are managed separately in `config/images.env`.
+`make configure` also syncs that file into `apps/images.env`, which Kustomize uses to inject pinned image references into every deployment.
+
 ### 3. Choose Setup Mode
 
 #### Mode A (Recommended): Local Laptop with nip.io
@@ -180,6 +183,8 @@ This performs:
 - `make up`
 - `make secrets`
 - `make sync`
+
+Before upgrades, update the pinned image references in `config/images.env`, run `make configure`, and commit both `config/images.env` and `apps/images.env`.
 
 ### 5. Retrieve Credentials
 Get the default ArgoCD admin password:
@@ -285,6 +290,8 @@ spec:
 
 If the app exposes a host, add a matching replacement entry in `apps/kustomization.yaml` and a corresponding host value in `config/runtime.env`.
 
+If the app needs a pinned image managed centrally, add a new `*_IMAGE` entry to `config/images.env`, run `make configure`, and add the corresponding replacement rule in `apps/kustomization.yaml`.
+
 #### 8.2 Add/update local secret values
 
 Add required keys to local `.env`, then apply:
@@ -301,7 +308,7 @@ If the app needs a new key (example `APP_DB_PASSWORD`), add it to:
 
 #### 8.3 Commit and sync
 
-Commit and push the manifest changes together with any runtime file changes in `config/`, `apps/`, and `argocd/`. ArgoCD then reconciles the cluster from Git.
+Commit and push the manifest changes together with any runtime or image file changes in `config/`, `apps/`, and `argocd/`. ArgoCD then reconciles the cluster from Git.
 
 #### 8.4 Verify app rollout
 

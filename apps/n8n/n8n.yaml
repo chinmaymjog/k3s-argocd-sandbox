@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: n8n
-        image: docker.n8n.io/n8nio/n8n:latest
+        image: docker.n8n.io/n8nio/n8n:2.18.7
         env:
         - name: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
           value: "true"
