@@ -76,7 +76,7 @@ The current repo also separates secret values from tracked manifests. Local user
 - **User-Controlled Local Secrets**: Passwords and tokens are supplied from a local `.env` file and applied into `sandbox-secrets`, keeping real values out of tracked manifests.
 - **Developer Experience (DX)**: The entire lifecycle is abstracted via a minimalist Makefile:
     - `make configure`: Write the tracked runtime config for domain and repo URL.
-    - `make up`: Install or reuse K3s and install ArgoCD.
+    - `make up`: Install or reuse a pinned K3s release and install ArgoCD.
     - `make bootstrap`: Apply secrets and bootstrap the ArgoCD app-of-apps.
     - `make password`: Fetch the initial ArgoCD admin password.
     - `make secrets`: Apply local secret values into the cluster.
