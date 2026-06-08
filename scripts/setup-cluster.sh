@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 K3S_KUBECONFIG="${K3S_KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+K3S_VERSION="${K3S_VERSION:-v1.36.1+k3s1}"
 SUDO=""
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -21,13 +22,13 @@ fi
 if command -v k3s &> /dev/null; then
     echo "⚠️ k3s is already installed. Skipping installation."
 else
-    echo "🚀 Installing k3s..."
+    echo "🚀 Installing k3s ${K3S_VERSION}..."
     install_args=(server --write-kubeconfig-mode 644)
     if [[ -n "${K3S_TLS_SAN:-}" ]]; then
         install_args+=(--tls-san "${K3S_TLS_SAN}")
     fi
 
-    curl -sfL https://get.k3s.io | ${SUDO} sh -s - "${install_args[@]}"
+    curl -sfL https://get.k3s.io | ${SUDO} INSTALL_K3S_VERSION="${K3S_VERSION}" sh -s - "${install_args[@]}"
     echo "✅ k3s installed."
 fi
 

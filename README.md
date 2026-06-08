@@ -63,6 +63,7 @@ This lab provides a "Sandboxed" environment that mimics a production cloud setup
 *   **Operating System**: Linux host or Linux VM with `systemd` and `sudo`.
 *   **Tools**: `curl`, `kubectl`, `make`.
 *   **Ports**: `80` and `443` available on the host for Traefik ingress.
+*   **Tested K3s version**: `v1.36.1+k3s1`
 
 Install example (Debian/Ubuntu):
 
@@ -167,6 +168,12 @@ Install or reuse K3s on the host, apply local secrets, and bootstrap ArgoCD:
 
 ```bash
 make bootstrap
+```
+
+To override the pinned K3s release for a test run:
+
+```bash
+make bootstrap K3S_VERSION=v1.35.5+k3s1
 ```
 
 This performs:
