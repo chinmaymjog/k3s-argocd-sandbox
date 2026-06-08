@@ -53,9 +53,9 @@ graph TD
 ```
 
 #### 🏗️ The App-of-Apps Pattern
-By installing ArgoCD into a lightweight K3s cluster (via `k3d`), I implemented the **App-of-Apps** pattern. A single `bootstrap.yaml` manifest tells ArgoCD to watch the `apps/` directory in the repository. When a new Kubernetes Deployment or Ingress is committed to Git, ArgoCD can reconcile the cluster state to match.
+By installing ArgoCD into a lightweight K3s cluster, I implemented the **App-of-Apps** pattern. A single `bootstrap.yaml` manifest tells ArgoCD to watch the `apps/` directory in the repository. When a new Kubernetes Deployment or Ingress is committed to Git, ArgoCD can reconcile the cluster state to match.
 
-In practice, local bootstrap still includes a few explicit operator steps: point ArgoCD at your fork, apply local secrets, and then bootstrap the apps. That keeps the flow simple without pretending the first-run experience is fully automatic.
+In practice, the repo now centralizes non-secret runtime inputs in a tracked config file so bootstrap and ArgoCD stay aligned. Local operators still apply their own secrets from `.env`, but they no longer need to rewrite manifests by hand for domain or repo URL changes.
 
 #### 🛡️ Unified Ingress & Cert-Manager
 Accessing services via `NodePort` is a friction point. I utilized the built-in Traefik ingress controller that ships with K3s.
@@ -75,10 +75,11 @@ The current repo also separates secret values from tracked manifests. Local user
 - **Server-Side Apply**: Working with massive CRDs (like ArgoCD's ApplicationSet) often breaks standard `kubectl apply` due to annotation size limits. I automated the ArgoCD installation using `--server-side --force-conflicts` to guarantee a smooth bootstrap.
 - **User-Controlled Local Secrets**: Passwords and tokens are supplied from a local `.env` file and applied into `sandbox-secrets`, keeping real values out of tracked manifests.
 - **Developer Experience (DX)**: The entire lifecycle is abstracted via a minimalist Makefile:
-    - `make up`: Spin up the K3s cluster and install ArgoCD.
+    - `make configure`: Write the tracked runtime config for domain and repo URL.
+    - `make up`: Install or reuse K3s and install ArgoCD.
+    - `make bootstrap`: Apply secrets and bootstrap the ArgoCD app-of-apps.
     - `make password`: Fetch the initial ArgoCD admin password.
     - `make secrets`: Apply local secret values into the cluster.
-    - `kubectl apply -f argocd/bootstrap.yaml`: Kick off the automated GitOps sync.
 
 ---
 
