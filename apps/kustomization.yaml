@@ -1,5 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# This base reads the generated runtime and image mirrors.
+# Edit config/runtime.env and config/images.env, then run make configure.
+# App flow:
+# 1. add or update manifests in apps/<name>/
+# 2. map any host/image values here
+# 3. let ArgoCD sync the tree
 resources:
   - adminer/adminer.yaml
   - cert-manager/issuer.yaml
