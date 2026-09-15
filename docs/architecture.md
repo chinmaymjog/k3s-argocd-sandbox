@@ -1,170 +1,71 @@
-# Architecture and Decisions
+# Architecture
 
-## Document Control
+## What This Is
 
-- Project: K3s-ArgoCD Sandbox
-- Owner: Chinmay Jog
-- Last updated: 2026-06-06
-- Version: 0.1.0
+A local-cloud style Kubernetes environment for validating GitOps
+delivery patterns, modular app deployment, and baseline platform
+tooling. It's the direct Kubernetes/GitOps progression of
+`cloudops-sandbox` - same operator model, runtime moved from Docker
+Compose to K3s + ArgoCD. See the diagram in `README.md`.
 
-## How To Use This File
+## How It Works
 
-- Explain design choices so a new engineer can understand trade-offs quickly.
-- Keep each section tied to requirement IDs from docs/project-spec.md.
-- Add one ADR entry whenever a non-trivial decision is made.
+1. `make configure` writes `.env` values into the generated Kustomize
+   runtime/image mirrors (`config/`, `apps/`, `argocd/`, and each
+   `apps/optional/<group>/`).
+2. `make up` installs or reuses K3s on the host and installs ArgoCD.
+3. `make bootstrap` applies secrets and the ArgoCD bootstrap
+   Application.
+4. ArgoCD syncs the `apps/` Kustomize tree (core apps) using the
+   committed runtime config.
+5. Apps are reached through host-based Traefik ingress
+   (`<service>.$APP_DOMAIN`).
+6. Optional groups (`identity`, `db-admin`) are separate ArgoCD
+   Applications under `argocd/optional/`, applied manually when wanted.
 
-## System Context
+App state persists via Kubernetes PVCs; desired state lives in Git
+manifests, reconciled by ArgoCD.
 
-### Business and Technical Context
+## Key Decisions
 
-K3s-ArgoCD Sandbox provides a local-cloud style Kubernetes environment for validating GitOps delivery patterns, modular app deployment, and baseline platform tooling.
+- **Decision:** ArgoCD is the single deployment mechanism - no
+  imperative `kubectl apply` per app.
+  **Why:** Consistent, declarative rollout for every sandbox app.
+  **Revisit if:** Sync failures become persistent across core apps.
 
-It is the direct Kubernetes and GitOps progression of `cloudops-sandbox`. The operator model stays the same, but the runtime changed from Docker Compose to K3s, Kubernetes manifests, and ArgoCD reconciliation.
+- **Decision:** Each app keeps its own Kubernetes manifests under
+  `apps/<name>/` (core) or `apps/optional/<group>/` (optional).
+  **Why:** Scalable onboarding pattern as more tools get added.
+  **Revisit if:** App count causes real manifest sprawl.
 
-### Architecture Goals
+- **Decision:** `.env` is the single source of truth for runtime
+  config and image pins; `config/runtime.env`, `apps/runtime.env`,
+  `argocd/runtime.env`, and the `images.env` files are all generated
+  mirrors (`make configure`), never hand-edited.
+  **Why:** One file to edit instead of five kept manually in sync.
+  **Revisit if:** The generated-mirror approach stops scaling to more
+  Kustomize bases.
 
-- Keep cluster lifecycle simple and repeatable via Make and scripts.
-- Keep app delivery declarative and repository-driven through ArgoCD sync.
-- Keep bootstrap and GitOps runtime inputs aligned through a tracked runtime config file.
-- Preserve the CloudOps sandbox mental model while moving to a Kubernetes-native workflow.
+- **Decision:** Split apps into a core set (always synced) plus opt-in
+  groups - `identity` (Keycloak) and `db-admin` (MySQL, Adminer,
+  phpMyAdmin) - each its own Kustomize base with its own ArgoCD
+  Application under `argocd/optional/`, applied manually
+  (`kubectl apply -f argocd/optional/<group>.yaml`).
+  **Why:** `make bootstrap` used to deploy all 9 apps unconditionally -
+  more workloads, secrets, and exposed surface than most first-time
+  users need.
+  **Revisit if:** A third or fourth optional group makes the manual
+  per-group apply flow unwieldy enough to justify an ApplicationSet.
 
-## High-Level Design
+## Known Risks / Rough Edges
 
-### Component Overview
-
-| Component | Responsibility | Owner |
-| --------- | -------------- | ----- |
-| K3s Cluster | Host Kubernetes runtime for sandbox apps | Platform Team |
-| ArgoCD | GitOps sync engine for manifests in apps/ | Platform Team |
-| config/runtime.env | Shared non-secret runtime inputs for bootstrap and ArgoCD | Platform Team |
-| apps/ Manifests | Modular app deployment definitions | Platform Team |
-| Ingress (Traefik) | Host-based routing for app endpoints | Platform Team |
-| cloudops-sandbox lineage | Prior modular lab that informed the current structure | Platform Team |
-
-### Interaction Diagram
-
-See high-level architecture diagram in README.md.
-
-## Data and Control Flow
-
-### Request/Response Flow
-
-1. User starts environment via make up.
-2. User writes config/runtime.env through make configure.
-3. k3s is installed or reused on the host and ArgoCD is installed.
-4. User runs make bootstrap, which applies secrets and the ArgoCD bootstrap application.
-5. ArgoCD syncs the apps/ Kustomize tree using the same runtime config files committed in Git.
-6. User accesses apps through host-based ingress endpoints.
-
-### State and Data Model Notes
-
-- App state persists through Kubernetes PVC-backed storage.
-- Cluster state and app desired state are represented in Git manifests.
-
-### Failure Paths
-
-- Bootstrap source repo mismatch prevents app sync.
-- Runtime domain drift between bootstrap and checked-in manifests prevents healthy sync.
-- Ingress/domain mismatch causes endpoint unreachability.
-- Storage class or PVC issues block stateful workload startup.
-
-## Deployment Architecture
-
-### Environments
-
-- Local laptop
-- Remote VM
-
-### Runtime Topology
-
-- Single-host K3s cluster.
-- ArgoCD controller in argocd namespace.
-- App workloads in default and app-specific namespaces.
-
-### Release and Rollback Strategy
-
-- Changes are delivered via branch + PR merge.
-- Rollback by reverting manifest changes and letting ArgoCD resync.
-
-## Security and Compliance
-
-- AuthN/AuthZ model: ArgoCD admin credential with optional app-native auth.
-- Secret management: sandbox-only secrets in manifests; production alternatives documented.
-- Input validation boundaries: Kubernetes API validation + app-level validation.
-- Audit/logging requirements: kubectl logs/events and ArgoCD sync history.
-
-## Observability Strategy
-
-- Logs: Kubernetes pod logs and ArgoCD controller logs.
-- Metrics: Prometheus/Grafana stack from apps/ manifests.
-- Traces: not standardized in current scope.
-- Alerts/SLOs: manual/experimental for sandbox scope.
-
-## External Dependencies
-
-| Dependency | Purpose | SLA/Risk | Backup Plan |
-| ---------- | ------- | -------- | ----------- |
-| k3s install script + pinned K3S_VERSION | Cluster bootstrap | Installer or release asset failure | Re-run install, inspect `systemctl status k3s`, or override `K3S_VERSION` |
-| nip.io/public DNS | Hostname routing | DNS and certificate setup mismatch | Use local host mapping fallback for testing |
-
-## Architecture Decision Records (ADR-lite)
-
-### Decisions
-
-- ID: ADR-001
-- Title: Use ArgoCD as the single deployment mechanism
-- Status: Accepted
-- Date: 2026-06-06
-- Context: Need consistent, declarative deployment for all sandbox apps.
-- Decision: All app rollout is driven by ArgoCD sync from repository manifests.
-- Requirement links: FR-002, NFR-002
-- Alternatives considered: Imperative kubectl apply per app.
-- Consequences: Better consistency, requires bootstrap correctness.
-- Review trigger: Sync failures become persistent across core apps.
-
-- ID: ADR-002
-- Title: Keep modular app structure under apps/<name>
-- Status: Accepted
-- Date: 2026-06-06
-- Context: Need scalable onboarding pattern for additional tools.
-- Decision: Each app keeps its own Kubernetes manifests under apps/<name>/.
-- Requirement links: FR-004, NFR-002
-- Alternatives considered: Monolithic manifest bundle.
-- Consequences: Better modularity, more files to maintain.
-- Review trigger: App count causes manifest sprawl and onboarding friction.
-
-- ID: ADR-003
-- Title: Evolve the CloudOps sandbox into a Kubernetes GitOps sandbox
-- Status: Accepted
-- Date: 2026-06-08
-- Context: The Docker Compose sandbox proved the modular lab model, but the next step is to validate the same ideas with Kubernetes and ArgoCD.
-- Decision: Keep the same modular, host-based lab structure while moving the runtime to K3s and GitOps-managed manifests.
-- Requirement links: FR-001, FR-002, FR-003, FR-005
-- Alternatives considered: Keep extending the Docker Compose lab only.
-- Consequences: Better alignment with modern platform workflows, more bootstrap and config layers to manage.
-- Review trigger: GitOps overhead outweighs the value of validating Kubernetes-native delivery.
-
-- ID: ADR-004
-- Title: Split apps into a core set plus opt-in optional groups
-- Status: Accepted
-- Date: 2026-09-15
-- Context: `make bootstrap` deployed all nine apps unconditionally, forcing every user to pay for Keycloak and a second DB engine (MySQL, Adminer, phpMyAdmin) in workloads, secrets, and exposed surface even when they only wanted the core lab (ArgoCD, Traefik, Cert-Manager, Postgres, Grafana, Prometheus, n8n).
-- Decision: Keep core apps in `apps/kustomization.yaml`, synced by the existing `sandbox-apps` Application. Move Keycloak into `apps/optional/identity/` and MySQL/Adminer/phpMyAdmin into `apps/optional/db-admin/`, each its own Kustomize base with a separate ArgoCD Application under `argocd/optional/` that a user applies manually (`kubectl apply -f argocd/optional/<group>.yaml`) when they want it. `configure-runtime.sh` writes the same generated runtime/image mirrors into each optional group's directory.
-- Requirement links: FR-002, FR-004
-- Alternatives considered: A single ArgoCD ApplicationSet driven by a values file (more moving parts for a two-group split); Kustomize `components` (still requires each optional service to sit inside the base's directory tree the same way, without giving each group its own independently-appliable Application).
-- Consequences: Onboarding a new optional app now has two paths (core vs. optional) instead of one, documented in the README. Optional manifests can no longer live under a flat `apps/<name>/` path reachable from outside their group's directory - Kustomize's load restrictor blocks resource references that climb outside the kustomization root, so each optional group's files must live inside its own tree.
-- Review trigger: A third or fourth optional group makes the manual per-group Application-apply flow unwieldy enough to justify an ApplicationSet.
-
-## Lightweight Traceability
-
-- FR-001 -> Makefile lifecycle and scripts/ automation -> ADR-001
-- FR-002 -> argocd/bootstrap.yaml, argocd/kustomization.yaml, and apps/ sync model -> ADR-001
-- FR-003 -> Traefik ingress host rules in app manifests -> ADR-002
-- FR-004 -> apps/<name>/ modular manifest pattern -> ADR-002
-- FR-005 -> README setup flows for local and remote usage -> ADR-003
-
-## Pending Decisions
-
-- Decision needed: Standard production-grade secret management path for future hardening.
-- Owner: Platform Team
-- Due date: 2026-07-15
+- Kustomize's load restrictor blocks resource/configMapGenerator file
+  references that climb outside a kustomization's own directory tree -
+  each optional group's manifests have to live fully inside that
+  group's folder, they can't reference core manifests by relative path.
+- Runtime domain drift between what was used to bootstrap and what's
+  currently checked in will break ArgoCD sync - re-run `make configure`
+  after changing `.env`.
+- Secrets in this repo are sandbox-only convenience; there's no
+  production-grade secret manager integration (Sealed Secrets, External
+  Secrets, etc.) in scope.
