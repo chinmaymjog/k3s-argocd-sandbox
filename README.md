@@ -119,10 +119,22 @@ make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USER
 ```
 
 This writes `config/runtime.env`, then syncs the Kustomize runtime files under `apps/` and `argocd/`.
-Commit all three runtime files so ArgoCD reconciles the same domain and repo settings you bootstrapped with.
 
 Image versions are managed separately in `config/images.env`.
 `make configure` also syncs that file into `apps/images.env`, which Kustomize uses to inject pinned image references into every deployment.
+
+> [!IMPORTANT]
+> **Commit and push all 5 generated files** (`config/runtime.env`,
+> `apps/runtime.env`, `argocd/runtime.env`, `config/images.env`,
+> `apps/images.env`) before running `make bootstrap` or `make sync`.
+> ArgoCD syncs from the Git remote at `TARGET_REVISION`, not your local
+> filesystem - it has no way to see what `make configure` just wrote
+> unless those changes are pushed. Running `make configure` with a
+> custom `APP_DOMAIN` but skipping this step is the #1 cause of "ArgoCD
+> says Synced but the Ingress host is still `127.0.0.1.nip.io`" - the
+> sync succeeded, it just synced the old committed values.
+> `make check-config` (also run by `make up`/`make bootstrap`) warns if
+> these files have local changes that aren't committed yet.
 
 ### 3. Choose Setup Mode
 
