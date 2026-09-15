@@ -47,9 +47,17 @@ manifests, reconciled by ArgoCD.
 
 ## Known Risks / Rough Edges
 
+- ArgoCD syncs `apps/runtime.env`/`apps/images.env` from Git at
+  `TARGET_REVISION`, not the local filesystem. Confirmed live: running
+  `make configure APP_DOMAIN=<custom>` regenerates these files locally,
+  but ArgoCD keeps applying the previously-committed values (Ingress
+  hosts, image pins) until the regenerated files are committed and
+  pushed - `make configure` reports success either way, so this fails
+  silently unless you know to check. `check-runtime-config.sh` now
+  warns when these files have uncommitted local changes.
 - Runtime domain drift between what was used to bootstrap and what's
   currently checked in will break ArgoCD sync - re-run `make configure`
-  after changing `APP_DOMAIN`/`REPO_URL`.
+  **and commit + push the result** after changing `APP_DOMAIN`/`REPO_URL`.
 - Secrets in this repo are sandbox-only convenience; there's no
   production-grade secret manager integration (Sealed Secrets, External
   Secrets, etc.) in scope.
