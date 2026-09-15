@@ -9,8 +9,6 @@ spec:
     repoURL: 'https://github.com/chinmaymjog/k3s-argocd-sandbox.git'
     targetRevision: main
     path: apps
-    directory:
-      recurse: true
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: default
