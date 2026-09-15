@@ -29,24 +29,21 @@ graph TD
 
     subgraph "Modular Stacks (Kubernetes)"
     direction TB
-        App1[Keycloak]
-        App2[n8n]
-        App3[Prometheus/Grafana]
+        App1[n8n]
+        App2[Prometheus/Grafana]
     end
 
     subgraph "Persistence Layer (PVCs)"
     direction TB
-        DB[(PostgreSQL / MySQL)]
+        DB[(PostgreSQL)]
         Vol[(App Data Volumes)]
     end
 
     ArgoCD -->|Syncs Manifests| App1
     ArgoCD -->|Syncs Manifests| App2
-    ArgoCD -->|Syncs Manifests| App3
     
     Traefik --> App1
     Traefik --> App2
-    Traefik --> App3
     
     App1 --> DB
     App2 --> DB
