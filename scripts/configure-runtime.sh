@@ -8,6 +8,7 @@ APPS_RUNTIME_FILE="$BASE_DIR/apps/runtime.env"
 ARGOCD_RUNTIME_FILE="$BASE_DIR/argocd/runtime.env"
 IMAGES_FILE="$BASE_DIR/config/images.env"
 APPS_IMAGES_FILE="$BASE_DIR/apps/images.env"
+OPTIONAL_GROUPS=(identity db-admin)
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "❌ Missing .env file at $ENV_FILE"
@@ -74,3 +75,12 @@ EOF
 echo "✅ Wrote runtime mirrors to $RUNTIME_FILE, $APPS_RUNTIME_FILE, and $ARGOCD_RUNTIME_FILE"
 cp "$IMAGES_FILE" "$APPS_IMAGES_FILE"
 echo "✅ Wrote image mirrors to $IMAGES_FILE and $APPS_IMAGES_FILE"
+
+for group in "${OPTIONAL_GROUPS[@]}"; do
+  group_dir="$BASE_DIR/apps/optional/$group"
+  if [[ -d "$group_dir" ]]; then
+    write_runtime_file "$group_dir/runtime.env"
+    cp "$IMAGES_FILE" "$group_dir/images.env"
+    echo "✅ Wrote optional group mirrors to $group_dir"
+  fi
+done

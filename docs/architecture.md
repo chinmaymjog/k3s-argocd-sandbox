@@ -144,6 +144,17 @@ See high-level architecture diagram in README.md.
 - Consequences: Better alignment with modern platform workflows, more bootstrap and config layers to manage.
 - Review trigger: GitOps overhead outweighs the value of validating Kubernetes-native delivery.
 
+- ID: ADR-004
+- Title: Split apps into a core set plus opt-in optional groups
+- Status: Accepted
+- Date: 2026-09-15
+- Context: `make bootstrap` deployed all nine apps unconditionally, forcing every user to pay for Keycloak and a second DB engine (MySQL, Adminer, phpMyAdmin) in workloads, secrets, and exposed surface even when they only wanted the core lab (ArgoCD, Traefik, Cert-Manager, Postgres, Grafana, Prometheus, n8n).
+- Decision: Keep core apps in `apps/kustomization.yaml`, synced by the existing `sandbox-apps` Application. Move Keycloak into `apps/optional/identity/` and MySQL/Adminer/phpMyAdmin into `apps/optional/db-admin/`, each its own Kustomize base with a separate ArgoCD Application under `argocd/optional/` that a user applies manually (`kubectl apply -f argocd/optional/<group>.yaml`) when they want it. `configure-runtime.sh` writes the same generated runtime/image mirrors into each optional group's directory.
+- Requirement links: FR-002, FR-004
+- Alternatives considered: A single ArgoCD ApplicationSet driven by a values file (more moving parts for a two-group split); Kustomize `components` (still requires each optional service to sit inside the base's directory tree the same way, without giving each group its own independently-appliable Application).
+- Consequences: Onboarding a new optional app now has two paths (core vs. optional) instead of one, documented in the README. Optional manifests can no longer live under a flat `apps/<name>/` path reachable from outside their group's directory - Kustomize's load restrictor blocks resource references that climb outside the kustomization root, so each optional group's files must live inside its own tree.
+- Review trigger: A third or fourth optional group makes the manual per-group Application-apply flow unwieldy enough to justify an ApplicationSet.
+
 ## Lightweight Traceability
 
 - FR-001 -> Makefile lifecycle and scripts/ automation -> ADR-001
