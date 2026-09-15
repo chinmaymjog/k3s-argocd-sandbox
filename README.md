@@ -189,6 +189,20 @@ If you want to change the host name strategy, change `APP_DOMAIN` in `.env` and 
 If you want to use a different repo or branch, change `REPO_URL` or `TARGET_REVISION` in `.env` and run `make configure` again.
 If you want to pin different container versions, edit the image variables in `.env` and run `make configure` again.
 
+> [!IMPORTANT]
+> **Commit and push all the generated files** (`config/runtime.env`,
+> `apps/runtime.env`, `argocd/runtime.env`, `config/images.env`,
+> `apps/images.env`, and the same five under each
+> `apps/optional/<group>/` you use) before running `make bootstrap` or
+> `make sync`. ArgoCD syncs from the Git remote at `TARGET_REVISION`,
+> not your local filesystem - it has no way to see what `make configure`
+> just wrote unless those changes are pushed. Running `make configure`
+> with a custom `APP_DOMAIN` but skipping this step is the #1 cause of
+> "ArgoCD says Synced but the Ingress host is still `127.0.0.1.nip.io`" -
+> the sync succeeded, it just synced the old committed values.
+> `make check-config` (also run by `make up`/`make bootstrap`) warns if
+> these files have local changes that aren't committed yet.
+
 ### 3. Choose One Setup Target
 Pick exactly one of these. Do not mix them.
 
