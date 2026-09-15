@@ -15,7 +15,7 @@ Use this repository to evolve the GitOps sandbox while keeping local secrets, bo
 - Keep app manifests under `apps/` small and focused.
 - Keep `argocd/bootstrap.yaml` and README setup steps aligned.
 - Use the local `.env` plus `make secrets` flow for sandbox secret values.
-- If database-backed apps are added, follow the documented init-script pattern for PostgreSQL or MySQL.
+- If database-backed apps are added, follow the documented init-script pattern for PostgreSQL.
 
 ## Guardrails
 

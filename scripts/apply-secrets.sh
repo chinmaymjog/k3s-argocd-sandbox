@@ -22,11 +22,8 @@ set +a
 
 required_vars=(
   POSTGRES_PASSWORD
-  MYSQL_ROOT_PASSWORD
-  KEYCLOAK_DB_PASSWORD
   N8N_DB_PASSWORD
   GRAFANA_DB_PASSWORD
-  KEYCLOAK_ADMIN_PASSWORD
   N8N_ENCRYPTION_KEY
 )
 
@@ -39,11 +36,8 @@ done
 
 kubectl -n default create secret generic sandbox-secrets \
   --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-  --from-literal=MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
-  --from-literal=KEYCLOAK_DB_PASSWORD="$KEYCLOAK_DB_PASSWORD" \
   --from-literal=N8N_DB_PASSWORD="$N8N_DB_PASSWORD" \
   --from-literal=GRAFANA_DB_PASSWORD="$GRAFANA_DB_PASSWORD" \
-  --from-literal=KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
   --from-literal=N8N_ENCRYPTION_KEY="$N8N_ENCRYPTION_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
