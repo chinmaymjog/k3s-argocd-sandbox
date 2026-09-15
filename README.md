@@ -6,9 +6,20 @@ A modular, automated infrastructure sandbox for testing cloud-native stacks, obs
 > [!TIP]
 > This lab mimics a production cloud environment with modular stacks and unified ingress.
 
+> [!NOTE]
+> `k3s-argocd-sandbox` is the next step after `cloudops-sandbox`: the same modular lab concept, but moved from Docker Compose to Kubernetes plus ArgoCD so the deployment model matches a GitOps workflow.
+
 ## 🏗️ Architecture: The "GitOps Cloud" Design
 
 Like cloudops-sandbox, this project keeps ingress, control-plane logic, and modular application stacks. The runtime model shifts from Docker Compose to Kubernetes manifests synced by ArgoCD.
+
+The design intentionally preserves the mental model from `cloudops-sandbox`:
+- one ingress entry point
+- modular service directories
+- shared runtime inputs
+- simple lifecycle commands
+
+The implementation changed from Compose stacks to Kubernetes resources, but the operator experience is meant to feel like the same lab at a higher fidelity layer.
 
 ```mermaid
 graph TD
@@ -60,8 +71,8 @@ This lab provides a "Sandboxed" environment that mimics a production cloud setup
 ## 📋 Prerequisites
 
 ### System Requirements
-*   **Operating System**: Linux host or Linux VM with `systemd` and `sudo`.
-*   **Tools**: `curl`, `kubectl`, `make`.
+*   **Operating System**: Linux host or Linux VM with `systemd`, `sudo`, and `kubectl`.
+*   **Tools**: `git`, `curl`, `make`.
 *   **Ports**: `80` and `443` available on the host for Traefik ingress.
 *   **Tested K3s version**: `v1.36.1+k3s1`
 
@@ -69,7 +80,7 @@ Install example (Debian/Ubuntu):
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y curl make
+sudo apt-get install -y git curl make kubectl
 ```
 
 ---
@@ -93,44 +104,65 @@ The lab is organized into modular stacks:
 
 ## 🛠️ Quick Start
 
-### 1. Fork & Clone
-ArgoCD should sync from your fork:
+Start here if you just want the working path:
+
+1. clone the repo
+2. copy `.env.example` to `.env`
+3. edit `.env`
+4. run `make configure`
+5. run `make bootstrap`
+6. run `make password` and `make status`
+
+### What You Edit
+
+Only edit `.env` for normal setup and customization.
+
+`make configure` reads `.env` and regenerates the Kustomize mirror files used by the cluster.
+
+### 1. Fork and Clone
+Clone your fork of the repository:
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
 cd k3s-argocd-sandbox
 ```
 
-Initialize local secret file:
+Create the local secret file:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your own secret values.
+Edit `.env` with your runtime values, image pins, and secret values.
 
-### 2. Write Runtime Config
+> [!IMPORTANT]
+> `REPO_URL` must be reachable from two places:
+> - the shell running `make bootstrap`
+> - ArgoCD inside the cluster
+>
+> If your fork is private, configure Git credentials for both places or use a public fork.
 
-Generate the tracked runtime config once for your environment:
-
-```bash
-make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
-```
-
-This writes `config/runtime.env`, then syncs the Kustomize runtime files under `apps/` and `argocd/`.
-Commit all three runtime files so ArgoCD reconciles the same domain and repo settings you bootstrapped with.
-
-Image versions are managed separately in `config/images.env`.
-`make configure` also syncs that file into `apps/images.env`, which Kustomize uses to inject pinned image references into every deployment.
-
-### 3. Choose Setup Mode
-
-#### Mode A (Recommended): Local Laptop with nip.io
-Recommended configure command:
+### 2. Configure Runtime Values
+Write the values in `.env` for your environment:
 
 ```bash
-make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
+make configure
 ```
+
+This command does two things:
+1. validates `.env`
+2. regenerates the Kustomize mirror files in `apps/` and `argocd/`
+
+If you want to change the host name strategy, change `APP_DOMAIN` in `.env` and run `make configure` again.
+If you want to use a different repo or branch, change `REPO_URL` or `TARGET_REVISION` in `.env` and run `make configure` again.
+If you want to pin different container versions, edit the image variables in `.env` and run `make configure` again.
+
+### 3. Choose One Setup Target
+Pick exactly one of these. Do not mix them.
+
+#### Option A: Local laptop with `nip.io`
+
+Use this option if you want the lab on your laptop and do not want to manage DNS.
 
 Expected access examples:
 - `http://argocd.127.0.0.1.nip.io`
@@ -138,16 +170,12 @@ Expected access examples:
 - `https://keycloak.127.0.0.1.nip.io`
 - `https://n8n.127.0.0.1.nip.io`
 
-Note: nip.io mode uses sandbox certificates, so browser certificate warnings are expected.
+Browser certificate warnings are expected in this mode.
 
-#### Mode B: Remote VM with nip.io
-Recommended configure command:
+#### Option B: Remote VM with `nip.io`
+Use this option if the cluster runs on a remote VM and you can open ports `80` and `443`.
 
-```bash
-make configure APP_DOMAIN=<VM_PUBLIC_IP>.nip.io REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
-```
-
-VM preflight:
+Before running `make bootstrap`, confirm:
 1. Open inbound ports `80` and `443` on the VM firewall/security group.
 2. Ensure ports `80` and `443` are available on the VM host.
 
@@ -157,34 +185,44 @@ Expected access examples:
 - `https://keycloak.<VM_PUBLIC_IP>.nip.io`
 - `https://n8n.<VM_PUBLIC_IP>.nip.io`
 
-#### Mode C (Optional Advanced): Public Domain
-Use this mode only if you want a custom DNS domain.
+Browser certificate warnings are expected in this mode.
 
-Recommended configure command:
+#### Option C: Public domain
+Use this option only if you already control DNS and want to manage a real domain.
 
-```bash
-make configure APP_DOMAIN=lab.yourdomain.com REPO_URL=https://github.com/YOUR_USERNAME/k3s-argocd-sandbox.git
-```
+Before running `make bootstrap`, confirm:
+1. `APP_DOMAIN` resolves to the host running K3s.
+2. Your DNS provider or certificate setup matches your chosen cluster setup.
 
-### 4. Setup Infrastructure
-Install or reuse K3s on the host, apply local secrets, and bootstrap ArgoCD:
+### 4. Bootstrap the Cluster
+Install or reuse K3s, apply secrets, and bootstrap ArgoCD:
 
 ```bash
 make bootstrap
 ```
 
-To override the pinned K3s release for a test run:
+To test a different K3s release:
 
 ```bash
 make bootstrap K3S_VERSION=v1.35.5+k3s1
 ```
 
-This performs:
-- `make up`
-- `make secrets`
-- `make sync`
+This runs:
+1. `make up`
+2. `make secrets`
+3. `make sync`
 
-Before upgrades, update the pinned image references in `config/images.env`, run `make configure`, and commit both `config/images.env` and `apps/images.env`.
+The cluster bootstrap is intentionally split this way:
+- `make up` installs or reuses K3s and installs ArgoCD
+- `make secrets` creates the sandbox secret set from `.env`
+- `make sync` applies the ArgoCD bootstrap application
+
+First bootstrap on a fresh host can take several minutes because K3s, Cert-Manager, and ArgoCD images must be pulled.
+If a rollout is slow, increase the wait:
+
+```bash
+make bootstrap ROLLOUT_TIMEOUT=1200s
+```
 
 ### 5. Retrieve Credentials
 Get the default ArgoCD admin password:
@@ -203,96 +241,45 @@ kubectl get ingress -A
 kubectl get application sandbox-apps -n argocd
 ```
 
-### 7. First Login (Recommended)
-Start with ArgoCD dashboard:
+### 7. First Login
+Start with the ArgoCD dashboard:
+
 - `http://argocd.<your-domain>`
 
 Then verify core apps:
+
 - `https://grafana.<your-domain>`
 - `https://keycloak.<your-domain>`
 - `https://n8n.<your-domain>`
 
-### 8. Onboard a New App
+### 8. Customize the Lab
 
-Use this flow for any new app manifest under `apps/<app-name>/`.
+Use this table if you want to change the default behavior without guessing which file matters.
 
-#### 8.1 Create app manifest
+| Change | Edit this file | Run after editing |
+| :--- | :--- | :--- |
+| Hostname/domain | `.env` | `make configure` |
+| Repo URL / branch | `.env` | `make configure` |
+| Image tags | `.env` | `make configure` |
+| App manifest behavior | `apps/<app-name>/*.yaml` | `make configure` if host/image wiring changed |
+| ArgoCD bootstrap repo path | `argocd/bootstrap.yaml` | `kubectl apply -k argocd` or `make sync` |
 
-ArgoCD bootstraps `apps/` recursively, so any new manifest in that tree is synced automatically.
+### 9. Onboard a New App
 
-Template (`apps/<app-name>/<app-name>.yaml`):
+Use this flow for any new app under `apps/<app-name>/`.
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: <app-name>
-  namespace: default
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: <app-name>
-  template:
-    metadata:
-      labels:
-        app: <app-name>
-    spec:
-      containers:
-        - name: <app-name>
-          image: <image-repo>:<tag>
-          ports:
-            - containerPort: 80
-          env:
-            - name: APP_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: sandbox-secrets
-                  key: APP_DB_PASSWORD
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: <app-name>
-  namespace: default
-spec:
-  selector:
-    app: <app-name>
-  ports:
-    - port: 80
-      targetPort: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: <app-name>
-  namespace: default
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt
-spec:
-  ingressClassName: traefik
-  tls:
-    - hosts:
-        - <app-name>.<your-domain>
-      secretName: <app-name>-tls
-  rules:
-    - host: <app-name>.<your-domain>
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: <app-name>
-                port:
-                  number: 80
-```
+1. Add the Kubernetes manifests under `apps/<app-name>/`.
+2. Add the new manifest path to the `resources:` list in `apps/kustomization.yaml` — Kustomize does not auto-discover files, so a manifest that isn't listed there is never applied, even though it lives under `apps/`.
+3. If the app needs a custom host name, add the host to `.env` and map it in `apps/kustomization.yaml`.
+4. If the app needs a custom image tag, add it to `.env` and map it in `apps/kustomization.yaml`.
+5. Run `make configure`.
+6. Commit the manifest changes together with the config updates.
 
-If the app exposes a host, add a matching replacement entry in `apps/kustomization.yaml` and a corresponding host value in `config/runtime.env`.
+If the app exposes a host, add a matching replacement entry in `apps/kustomization.yaml` and a corresponding host value in `.env`.
 
-If the app needs a pinned image managed centrally, add a new `*_IMAGE` entry to `config/images.env`, run `make configure`, and add the corresponding replacement rule in `apps/kustomization.yaml`.
+If the app needs a pinned image managed centrally, add a new `*_IMAGE` entry to `.env`, run `make configure`, and add the corresponding replacement rule in `apps/kustomization.yaml`.
 
-#### 8.2 Add/update local secret values
+### 10. Add or Update Local Secret Values
 
 Add required keys to local `.env`, then apply:
 
@@ -300,17 +287,17 @@ Add required keys to local `.env`, then apply:
 make secrets
 ```
 
-If the app needs a new key (example `APP_DB_PASSWORD`), add it to:
+If the app needs a new key, add it to:
 
 - `.env.example`
-- `scripts/apply-secrets.sh` required keys list
+- `scripts/apply-secrets.sh`
 - your local `.env`
 
-#### 8.3 Commit and sync
+### 11. Commit and Sync
 
 Commit and push the manifest changes together with any runtime or image file changes in `config/`, `apps/`, and `argocd/`. ArgoCD then reconciles the cluster from Git.
 
-#### 8.4 Verify app rollout
+### 12. Verify App Rollout
 
 ```bash
 kubectl rollout status deployment/<app-name> -n default --timeout=300s
@@ -318,7 +305,9 @@ kubectl get pods -n default -l app=<app-name>
 kubectl get ingress <app-name> -n default
 ```
 
-#### 8.5 DB-backed app extension (PostgreSQL/MySQL)
+### 13. DB-Backed App Extension
+
+This is optional and only needed when you add a database-backed app.
 
 When the app needs a dedicated DB/user:
 
@@ -326,8 +315,8 @@ When the app needs a dedicated DB/user:
 2. Add the same key in `.env.example` and `scripts/apply-secrets.sh`, then run `make secrets`.
 3. In `apps/pgsql/pgsql.yaml` or `apps/mysql/mysql.yaml`, add DB container env wiring from `sandbox-secrets`.
 4. Add provisioning line in DB init script ConfigMap:
-	 - PostgreSQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
-	 - MySQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
+   - PostgreSQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
+   - MySQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
 5. Re-apply changed DB manifest and rollout restart DB deployment.
 6. Run init script in the running DB pod to provision new DB/user without resetting data.
 

@@ -19,11 +19,14 @@
 
 K3s-ArgoCD Sandbox provides a local-cloud style Kubernetes environment for validating GitOps delivery patterns, modular app deployment, and baseline platform tooling.
 
+It is the direct Kubernetes and GitOps progression of `cloudops-sandbox`. The operator model stays the same, but the runtime changed from Docker Compose to K3s, Kubernetes manifests, and ArgoCD reconciliation.
+
 ### Architecture Goals
 
 - Keep cluster lifecycle simple and repeatable via Make and scripts.
 - Keep app delivery declarative and repository-driven through ArgoCD sync.
 - Keep bootstrap and GitOps runtime inputs aligned through a tracked runtime config file.
+- Preserve the CloudOps sandbox mental model while moving to a Kubernetes-native workflow.
 
 ## High-Level Design
 
@@ -36,6 +39,7 @@ K3s-ArgoCD Sandbox provides a local-cloud style Kubernetes environment for valid
 | config/runtime.env | Shared non-secret runtime inputs for bootstrap and ArgoCD | Platform Team |
 | apps/ Manifests | Modular app deployment definitions | Platform Team |
 | Ingress (Traefik) | Host-based routing for app endpoints | Platform Team |
+| cloudops-sandbox lineage | Prior modular lab that informed the current structure | Platform Team |
 
 ### Interaction Diagram
 
@@ -129,13 +133,24 @@ See high-level architecture diagram in README.md.
 - Consequences: Better modularity, more files to maintain.
 - Review trigger: App count causes manifest sprawl and onboarding friction.
 
+- ID: ADR-003
+- Title: Evolve the CloudOps sandbox into a Kubernetes GitOps sandbox
+- Status: Accepted
+- Date: 2026-06-08
+- Context: The Docker Compose sandbox proved the modular lab model, but the next step is to validate the same ideas with Kubernetes and ArgoCD.
+- Decision: Keep the same modular, host-based lab structure while moving the runtime to K3s and GitOps-managed manifests.
+- Requirement links: FR-001, FR-002, FR-003, FR-005
+- Alternatives considered: Keep extending the Docker Compose lab only.
+- Consequences: Better alignment with modern platform workflows, more bootstrap and config layers to manage.
+- Review trigger: GitOps overhead outweighs the value of validating Kubernetes-native delivery.
+
 ## Lightweight Traceability
 
 - FR-001 -> Makefile lifecycle and scripts/ automation -> ADR-001
 - FR-002 -> argocd/bootstrap.yaml, argocd/kustomization.yaml, and apps/ sync model -> ADR-001
 - FR-003 -> Traefik ingress host rules in app manifests -> ADR-002
 - FR-004 -> apps/<name>/ modular manifest pattern -> ADR-002
-- FR-005 -> README setup flows for local and remote usage -> ADR-001
+- FR-005 -> README setup flows for local and remote usage -> ADR-003
 
 ## Pending Decisions
 

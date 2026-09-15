@@ -7,12 +7,14 @@ if [[ -z "${KUBECONFIG:-}" && -f /etc/rancher/k3s/k3s.yaml ]]; then
   export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 fi
 
-if [[ -f "$BASE_DIR/config/runtime.env" ]]; then
+if [[ -f "$BASE_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1090
-  source "$BASE_DIR/config/runtime.env"
+  source "$BASE_DIR/.env"
   set +a
 fi
+
+ROLLOUT_TIMEOUT="${ROLLOUT_TIMEOUT:-900s}"
 
 # Check if kubectl is installed
 if ! command -v kubectl &> /dev/null; then
@@ -24,6 +26,18 @@ APP_DOMAIN=${APP_DOMAIN:-"127.0.0.1.nip.io"}
 ARGOCD_HOST="argocd.${APP_DOMAIN}"
 ARGOCD_VERSION=${ARGOCD_VERSION:-"v3.4.3"}
 
+rollout_or_die() {
+    local namespace="$1"
+    local resource="$2"
+
+    if ! kubectl -n "$namespace" rollout status "$resource" --timeout="$ROLLOUT_TIMEOUT"; then
+        echo "❌ Timed out waiting for $resource in namespace $namespace after $ROLLOUT_TIMEOUT."
+        kubectl -n "$namespace" get pods -o wide || true
+        kubectl -n "$namespace" get events --sort-by=.lastTimestamp | tail -n 60 || true
+        exit 1
+    fi
+}
+
 echo "🚀 Installing ArgoCD..."
 
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
@@ -32,13 +46,13 @@ kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" --server-side --force-conflicts
 
 echo "⏳ Waiting for ArgoCD server to be ready..."
-kubectl rollout status deployment argocd-server -n argocd --timeout=300s
+rollout_or_die argocd deployment/argocd-server
 
 echo "🔧 Patching ArgoCD server for insecure local ingress..."
 # We configure argocd-server in insecure mode because Traefik will handle the SSL termination locally
 kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"server.insecure":"true"}}'
 kubectl rollout restart deployment argocd-server -n argocd
-kubectl rollout status deployment argocd-server -n argocd --timeout=300s
+rollout_or_die argocd deployment/argocd-server
 
 echo "🌐 Creating ArgoCD Ingress (Traefik -> ${ARGOCD_HOST})..."
 cat <<EOF | kubectl apply -f -
