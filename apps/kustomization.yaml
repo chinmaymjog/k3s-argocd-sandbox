@@ -1,20 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# This is the CORE app set - good to get started, always synced by the
+# sandbox-apps Application. Optional groups (Keycloak, MySQL/Adminer/
+# phpMyAdmin) live under apps/optional/<group>/ and are opt-in - see
+# "Optional Stack Groups" in the README.
+#
 # This base reads the generated runtime and image mirrors.
-# Edit config/runtime.env and config/images.env, then run make configure.
+# Edit .env, then run make configure.
 # App flow:
 # 1. add or update manifests in apps/<name>/
 # 2. map any host/image values here
 # 3. let ArgoCD sync the tree
 resources:
-  - adminer/adminer.yaml
   - cert-manager/issuer.yaml
   - grafana/grafana.yaml
-  - keycloak/keycloak.yaml
-  - mysql/mysql.yaml
   - n8n/n8n.yaml
   - pgsql/pgsql.yaml
-  - phpmyadmin/phpmyadmin.yaml
   - prometheus/prometheus.yaml
 configMapGenerator:
   - name: sandbox-runtime
@@ -29,38 +30,11 @@ replacements:
   - source:
       kind: ConfigMap
       name: sandbox-runtime
-      fieldPath: data.ADMINER_HOST
-    targets:
-      - select:
-          kind: Ingress
-          name: adminer
-        fieldPaths:
-          - spec.rules.0.host
-          - spec.tls.0.hosts.0
-  - source:
-      kind: ConfigMap
-      name: sandbox-runtime
       fieldPath: data.GRAFANA_HOST
     targets:
       - select:
           kind: Ingress
           name: grafana
-        fieldPaths:
-          - spec.rules.0.host
-          - spec.tls.0.hosts.0
-  - source:
-      kind: ConfigMap
-      name: sandbox-runtime
-      fieldPath: data.KEYCLOAK_HOST
-    targets:
-      - select:
-          kind: Deployment
-          name: keycloak
-        fieldPaths:
-          - spec.template.spec.containers.[name=keycloak].env.[name=KC_HOSTNAME].value
-      - select:
-          kind: Ingress
-          name: keycloak
         fieldPaths:
           - spec.rules.0.host
           - spec.tls.0.hosts.0
@@ -93,17 +67,6 @@ replacements:
   - source:
       kind: ConfigMap
       name: sandbox-runtime
-      fieldPath: data.PHPMYADMIN_HOST
-    targets:
-      - select:
-          kind: Ingress
-          name: phpmyadmin
-        fieldPaths:
-          - spec.rules.0.host
-          - spec.tls.0.hosts.0
-  - source:
-      kind: ConfigMap
-      name: sandbox-runtime
       fieldPath: data.PROMETHEUS_HOST
     targets:
       - select:
@@ -115,16 +78,6 @@ replacements:
   - source:
       kind: ConfigMap
       name: sandbox-images
-      fieldPath: data.ADMINER_IMAGE
-    targets:
-      - select:
-          kind: Deployment
-          name: adminer
-        fieldPaths:
-          - spec.template.spec.containers.[name=adminer].image
-  - source:
-      kind: ConfigMap
-      name: sandbox-images
       fieldPath: data.GRAFANA_IMAGE
     targets:
       - select:
@@ -132,26 +85,6 @@ replacements:
           name: grafana
         fieldPaths:
           - spec.template.spec.containers.[name=grafana].image
-  - source:
-      kind: ConfigMap
-      name: sandbox-images
-      fieldPath: data.KEYCLOAK_IMAGE
-    targets:
-      - select:
-          kind: Deployment
-          name: keycloak
-        fieldPaths:
-          - spec.template.spec.containers.[name=keycloak].image
-  - source:
-      kind: ConfigMap
-      name: sandbox-images
-      fieldPath: data.MYSQL_IMAGE
-    targets:
-      - select:
-          kind: Deployment
-          name: mysql
-        fieldPaths:
-          - spec.template.spec.containers.[name=mysql].image
   - source:
       kind: ConfigMap
       name: sandbox-images
@@ -172,16 +105,6 @@ replacements:
           name: pgsql
         fieldPaths:
           - spec.template.spec.containers.[name=postgres].image
-  - source:
-      kind: ConfigMap
-      name: sandbox-images
-      fieldPath: data.PHPMYADMIN_IMAGE
-    targets:
-      - select:
-          kind: Deployment
-          name: phpmyadmin
-        fieldPaths:
-          - spec.template.spec.containers.[name=phpmyadmin].image
   - source:
       kind: ConfigMap
       name: sandbox-images

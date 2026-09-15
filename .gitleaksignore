@@ -4,3 +4,5 @@
 .env.example:generic-password-rule:35
 .env.example:generic-password-rule:42
 .env.example:generic-password-rule:43
+apps/optional/identity/runtime.env:generic-api-key:10
+apps/optional/db-admin/runtime.env:generic-api-key:10

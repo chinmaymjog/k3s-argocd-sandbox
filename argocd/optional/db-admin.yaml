@@ -1,0 +1,25 @@
+# Optional group: db-admin (MySQL, Adminer, phpMyAdmin).
+# Not synced automatically. Apply when you want this group:
+#   kubectl apply -f argocd/optional/db-admin.yaml
+# If you're running from a fork, edit repoURL/targetRevision below to match
+# what's in your own .env first.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sandbox-apps-db-admin
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/chinmaymjog/k3s-argocd-sandbox.git'
+    targetRevision: main
+    path: apps/optional/db-admin
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
