@@ -75,4 +75,19 @@ for var in "${required_images[@]}"; do
   fi
 done
 
+GENERATED_FILES=("$RUNTIME_FILE" "$APPS_RUNTIME_FILE" "$ARGOCD_RUNTIME_FILE" "$IMAGES_FILE" "$APPS_IMAGES_FILE")
+if command -v git >/dev/null 2>&1 && git -C "$BASE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  UNCOMMITTED=$(git -C "$BASE_DIR" status --porcelain -- "${GENERATED_FILES[@]}" 2>/dev/null)
+  if [[ -n "$UNCOMMITTED" ]]; then
+    echo "⚠️  Generated runtime/image files differ from what's committed:"
+    echo "$UNCOMMITTED" | sed 's/^/     /'
+    echo "   ArgoCD syncs from Git, not your local filesystem - it will keep"
+    echo "   using the committed values (not what 'make configure' just wrote"
+    echo "   locally) until you commit and push these files. This is the"
+    echo "   #1 cause of 'ArgoCD says Synced but the Ingress host/image is"
+    echo "   wrong' - commit and push before running 'make bootstrap' or"
+    echo "   'make sync' with a non-default APP_DOMAIN, REPO_URL, or image pin."
+  fi
+fi
+
 echo "✅ Runtime and image config are valid"
