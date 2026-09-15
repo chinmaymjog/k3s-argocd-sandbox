@@ -2,7 +2,7 @@
 
 KUBECONFIG ?= /etc/rancher/k3s/k3s.yaml
 APP_DOMAIN ?= 127.0.0.1.nip.io
-REPO_URL ?= https://github.com/chinmayjog/k3s-argocd-sandbox.git
+REPO_URL ?= https://github.com/chinmaymjog/k3s-argocd-sandbox.git
 TARGET_REVISION ?= main
 K3S_VERSION ?= v1.36.1+k3s1
 export KUBECONFIG

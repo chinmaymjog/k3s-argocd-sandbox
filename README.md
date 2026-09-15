@@ -218,7 +218,7 @@ Use this flow for any new app manifest under `apps/<app-name>/`.
 
 #### 8.1 Create app manifest
 
-ArgoCD bootstraps `apps/` recursively, so any new manifest in that tree is synced automatically.
+Add the new manifest path to the `resources:` list in `apps/kustomization.yaml` — Kustomize does not auto-discover files, so a manifest that isn't listed there is never applied, even though it lives under `apps/`.
 
 Template (`apps/<app-name>/<app-name>.yaml`):
 
