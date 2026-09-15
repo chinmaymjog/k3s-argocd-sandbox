@@ -21,23 +21,20 @@ graph TD
 	end
 
 	subgraph "Modular Stacks"
-		App1[Keycloak Stack]
-		App2[n8n Stack]
-		App3[Monitoring Stack]
+		App1[n8n Stack]
+		App2[Monitoring Stack]
 	end
 
 	subgraph "Persistence Layer"
-		DB[(PostgreSQL / MySQL)]
+		DB[(PostgreSQL)]
 		Vol[(Kubernetes PVCs)]
 	end
 
 	ArgoCD --> App1
 	ArgoCD --> App2
-	ArgoCD --> App3
 
 	Traefik --> App1
 	Traefik --> App2
-	Traefik --> App3
 
 	App1 --> DB
 	App2 --> DB
@@ -85,9 +82,13 @@ The lab is organized into modular stacks:
 | **SSL/TLS** | Cert-Manager | Automated certificate provisioning |
 | **Observability** | Prometheus, Grafana | Metrics and Dashboards |
 | **Automation** | n8n | Low-code workflow automation |
-| **Databases** | PostgreSQL, MySQL | Stateful data persistence via PVCs |
-| **Identity** | Keycloak | Identity and Access Management (OIDC/SAML) |
-| **Management** | Adminer, phpMyAdmin | Database management UIs |
+| **Databases** | PostgreSQL | Stateful data persistence via PVCs |
+
+This is the good-to-get-started set. Want Keycloak, MySQL, Adminer, or
+phpMyAdmin too? Check out the [`advanced`
+branch](https://github.com/chinmaymjog/k3s-argocd-sandbox/tree/advanced)
+- the same lab with those added, plus opt-in ArgoCD Applications for
+each so you don't pay for what you don't want by default.
 
 ---
 
@@ -135,7 +136,6 @@ make configure APP_DOMAIN=127.0.0.1.nip.io REPO_URL=https://github.com/YOUR_USER
 Expected access examples:
 - `http://argocd.127.0.0.1.nip.io`
 - `https://grafana.127.0.0.1.nip.io`
-- `https://keycloak.127.0.0.1.nip.io`
 - `https://n8n.127.0.0.1.nip.io`
 
 Note: nip.io mode uses sandbox certificates, so browser certificate warnings are expected.
@@ -154,7 +154,6 @@ VM preflight:
 Expected access examples:
 - `http://argocd.<VM_PUBLIC_IP>.nip.io`
 - `https://grafana.<VM_PUBLIC_IP>.nip.io`
-- `https://keycloak.<VM_PUBLIC_IP>.nip.io`
 - `https://n8n.<VM_PUBLIC_IP>.nip.io`
 
 #### Mode C (Optional Advanced): Public Domain
@@ -209,7 +208,6 @@ Start with ArgoCD dashboard:
 
 Then verify core apps:
 - `https://grafana.<your-domain>`
-- `https://keycloak.<your-domain>`
 - `https://n8n.<your-domain>`
 
 ### 8. Onboard a New App
@@ -218,7 +216,7 @@ Use this flow for any new app manifest under `apps/<app-name>/`.
 
 #### 8.1 Create app manifest
 
-ArgoCD bootstraps `apps/` recursively, so any new manifest in that tree is synced automatically.
+Add the new manifest path to the `resources:` list in `apps/kustomization.yaml` — Kustomize does not auto-discover files, so a manifest that isn't listed there is never applied, even though it lives under `apps/`.
 
 Template (`apps/<app-name>/<app-name>.yaml`):
 
@@ -318,29 +316,22 @@ kubectl get pods -n default -l app=<app-name>
 kubectl get ingress <app-name> -n default
 ```
 
-#### 8.5 DB-backed app extension (PostgreSQL/MySQL)
+#### 8.5 DB-backed app extension (PostgreSQL)
 
 When the app needs a dedicated DB/user:
 
 1. Add password key in local `.env` (example: `DEMO_DB_PASSWORD=...`).
 2. Add the same key in `.env.example` and `scripts/apply-secrets.sh`, then run `make secrets`.
-3. In `apps/pgsql/pgsql.yaml` or `apps/mysql/mysql.yaml`, add DB container env wiring from `sandbox-secrets`.
-4. Add provisioning line in DB init script ConfigMap:
-	 - PostgreSQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
-	 - MySQL: `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
-5. Re-apply changed DB manifest and rollout restart DB deployment.
-6. Run init script in the running DB pod to provision new DB/user without resetting data.
+3. In `apps/pgsql/pgsql.yaml`, add DB container env wiring from `sandbox-secrets`.
+4. Add a provisioning line in the DB init script ConfigMap:
+   `create_user_and_database "demo" "demo" "${DEMO_DB_PASSWORD}"`
+5. Re-apply the changed DB manifest and rollout restart the DB deployment.
+6. Run the init script in the running DB pod to provision the new DB/user without resetting data.
 
 PostgreSQL validation:
 
 ```bash
 kubectl exec -n default deployment/pgsql -- sh -lc 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '\''demo'\'';"; psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '\''demo'\'';"'
-```
-
-MySQL validation:
-
-```bash
-kubectl exec -n default deployment/mysql -- sh -lc 'mysql -N -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME=\"demo\"; SELECT User FROM mysql.user WHERE User=\"demo\";"'
 ```
 
 ---
