@@ -31,6 +31,29 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+      - name: wait-for-pgsql
+        image: postgres:15
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h pgsql -p 5432; do
+            echo "waiting for pgsql..."
+            sleep 2
+          done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
       containers:
       - name: n8n
         image: docker.n8n.io/n8nio/n8n:2.18.7
@@ -76,6 +99,33 @@ spec:
               key: N8N_DB_PASSWORD
         ports:
         - containerPort: 5678
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          periodSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /healthz/readiness
+            port: 5678
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
         volumeMounts:
         - name: n8n-data
           mountPath: /home/node/.n8n

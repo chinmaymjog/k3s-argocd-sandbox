@@ -31,6 +31,29 @@ spec:
         fsGroup: 472
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+      - name: wait-for-pgsql
+        image: postgres:15
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h pgsql -p 5432; do
+            echo "waiting for pgsql..."
+            sleep 2
+          done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
       containers:
       - name: grafana
         image: grafana/grafana-oss:13.0.1
@@ -65,6 +88,33 @@ spec:
               key: GRAFANA_ADMIN_PASSWORD
         ports:
         - containerPort: 3000
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
         volumeMounts:
         - name: grafana-data
           mountPath: /var/lib/grafana
