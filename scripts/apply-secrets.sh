@@ -47,7 +47,8 @@ secret_vars=(
 )
 
 for var in "${secret_vars[@]}"; do
-  lowered="${!var,,}"
+  # tr instead of ${var,,} so this also works on macOS's bash 3.2
+  lowered="$(printf '%s' "${!var}" | tr '[:upper:]' '[:lower:]')"
   if [[ "$lowered" =~ $placeholder_re ]]; then
     echo "❌ '$var' in .env is still a placeholder/default value ('${!var}')"
     echo "   Set a strong unique value, e.g.: openssl rand -hex 16"
