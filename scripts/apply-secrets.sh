@@ -24,6 +24,8 @@ required_vars=(
   POSTGRES_PASSWORD
   N8N_DB_PASSWORD
   GRAFANA_DB_PASSWORD
+  GRAFANA_ADMIN_USER
+  GRAFANA_ADMIN_PASSWORD
   N8N_ENCRYPTION_KEY
 )
 
@@ -34,10 +36,31 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
+# Reject placeholder/default values (e.g. copied verbatim from .env.example)
+placeholder_re='^(todo|changeme|change_me|password|admin|some-secret-key)$'
+secret_vars=(
+  POSTGRES_PASSWORD
+  N8N_DB_PASSWORD
+  GRAFANA_DB_PASSWORD
+  GRAFANA_ADMIN_PASSWORD
+  N8N_ENCRYPTION_KEY
+)
+
+for var in "${secret_vars[@]}"; do
+  lowered="${!var,,}"
+  if [[ "$lowered" =~ $placeholder_re ]]; then
+    echo "❌ '$var' in .env is still a placeholder/default value ('${!var}')"
+    echo "   Set a strong unique value, e.g.: openssl rand -hex 16"
+    exit 1
+  fi
+done
+
 kubectl -n default create secret generic sandbox-secrets \
   --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
   --from-literal=N8N_DB_PASSWORD="$N8N_DB_PASSWORD" \
   --from-literal=GRAFANA_DB_PASSWORD="$GRAFANA_DB_PASSWORD" \
+  --from-literal=GRAFANA_ADMIN_USER="$GRAFANA_ADMIN_USER" \
+  --from-literal=GRAFANA_ADMIN_PASSWORD="$GRAFANA_ADMIN_PASSWORD" \
   --from-literal=N8N_ENCRYPTION_KEY="$N8N_ENCRYPTION_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 

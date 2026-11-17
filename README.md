@@ -108,7 +108,11 @@ Initialize local secret file:
 cp .env.example .env
 ```
 
-Edit `.env` with your own secret values.
+Edit `.env` and replace every `TODO` with your own secret value (for example `openssl rand -hex 16`). `make secrets` rejects empty values and placeholders such as `TODO`, `password`, `admin` and `some-secret-key`.
+
+Grafana's admin login comes from `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`. Grafana only applies these on first start of a fresh database; for an existing install, reset the password with `grafana cli admin reset-admin-password`.
+
+> **Note:** Prometheus is published through an Ingress **without authentication**. Do not expose it on a public VM (nip.io Mode B) unless you restrict access (firewall, VPN or an auth middleware).
 
 ### 2. Write Runtime Config
 
