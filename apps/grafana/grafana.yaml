@@ -53,6 +53,16 @@ spec:
             secretKeyRef:
               name: sandbox-secrets
               key: GRAFANA_DB_PASSWORD
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: GRAFANA_ADMIN_USER
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sandbox-secrets
+              key: GRAFANA_ADMIN_PASSWORD
         ports:
         - containerPort: 3000
         volumeMounts:
