@@ -1,0 +1,9 @@
+# Changes to these paths always require review from the owner.
+# main is synced by ArgoCD, so manifests are effectively production for the sandbox.
+*                  @chinmaymjog
+/.github/          @chinmaymjog
+/apps/             @chinmaymjog
+/argocd/           @chinmaymjog
+/config/           @chinmaymjog
+/scripts/          @chinmaymjog
+/Makefile          @chinmaymjog
