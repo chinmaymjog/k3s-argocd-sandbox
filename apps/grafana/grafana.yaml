@@ -24,9 +24,21 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: grafana
         image: grafana/grafana-oss:13.0.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         env:
         - name: GF_DATABASE_TYPE
           value: "postgres"
@@ -46,10 +58,14 @@ spec:
         volumeMounts:
         - name: grafana-data
           mountPath: /var/lib/grafana
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: grafana-data
         persistentVolumeClaim:
           claimName: grafana-pvc
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
