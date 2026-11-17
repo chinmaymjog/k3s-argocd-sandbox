@@ -59,9 +59,21 @@ spec:
       labels:
         app: pgsql
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: postgres
         image: postgres:15
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:
@@ -86,6 +98,10 @@ spec:
         - name: pgsql-init
           mountPath: /docker-entrypoint-initdb.d/init-databases.sh
           subPath: init-databases.sh
+        - name: tmp
+          mountPath: /tmp
+        - name: pgsql-run
+          mountPath: /var/run/postgresql
       volumes:
       - name: pgsql-data
         persistentVolumeClaim:
@@ -94,6 +110,10 @@ spec:
         configMap:
           name: pgsql-init-scripts
           defaultMode: 0755
+      - name: tmp
+        emptyDir: {}
+      - name: pgsql-run
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

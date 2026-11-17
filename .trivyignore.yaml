@@ -1,0 +1,7 @@
+# Accepted IaC findings. Each entry needs a justification.
+misconfigurations:
+  # The pgsql-init-scripts ConfigMap holds a shell script that reads passwords
+  # from environment variables injected from the sandbox-secrets Secret. It
+  # contains variable names such as POSTGRES_PASSWORD, not secret values.
+  - id: KSV-0109
+    statement: "ConfigMap contains a script referencing password variable names, not secret values"
